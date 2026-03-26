@@ -36,7 +36,7 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
             <div className="flex items-center gap-3">
               <PokeballIcon size={36} />
               <div>
-                <h1 className="text-xl md:text-2xl font-black tracking-wider">RONIN LEAGUE</h1>
+                <h1 className="text-xl md:text-2xl font-black tracking-wider">Tondo Battle LEAGUE</h1>
                 <p className="text-xs text-primary-foreground/70">Trainer Dashboard</p>
               </div>
             </div>

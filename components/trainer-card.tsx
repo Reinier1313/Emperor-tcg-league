@@ -75,7 +75,7 @@ export function TrainerCard({ player, className }: TrainerCardProps) {
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
                     <h1 className="text-2xl md:text-3xl font-black text-primary-foreground tracking-wider drop-shadow-lg">
-                      RONIN LEAGUE
+                      Tondo Battle LEAGUE
                     </h1>
                     <div className="flex items-center justify-center gap-2 mt-1">
                       <div className="w-8 h-[2px] bg-primary-foreground/40" />

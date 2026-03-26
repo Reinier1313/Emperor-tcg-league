@@ -108,7 +108,7 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
         <div className="container mx-auto px-4 relative">
           <div className="flex flex-col items-center text-center">
             <PokeballIcon size={48} className="mb-4" />
-            <h1 className="text-3xl md:text-4xl font-black tracking-wider">RONIN LEAGUE</h1>
+            <h1 className="text-3xl md:text-4xl font-black tracking-wider">Tondo Battle LEAGUE</h1>
             <p className="text-primary-foreground/80 mt-2">Official Trainer Registry</p>
           </div>
         </div>

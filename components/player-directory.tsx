@@ -63,7 +63,7 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-xl md:text-2xl font-black tracking-wider">RONIN LEAGUE</h1>
+                <h1 className="text-xl md:text-2xl font-black tracking-wider">Tondo Battle LEAGUE</h1>
                 <p className="text-xs text-primary-foreground/70">Player Directory</p>
               </div>
             </div>
