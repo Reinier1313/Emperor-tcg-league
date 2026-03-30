@@ -41,7 +41,7 @@ interface LeagueStore {
 
 function generateTrainerId(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let result = 'RL-'
+  let result = 'TBL-'
   for (let i = 0; i < 5; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length))
   }

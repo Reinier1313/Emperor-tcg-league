@@ -161,7 +161,7 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
                     </Label>
                     <Input
                       id="login-identifier"
-                      placeholder="Enter trainer name or RL-XXXXX"
+                      placeholder="Enter trainer name or TBL-XXXXX"
                       value={loginIdentifier}
                       onChange={(e) => setLoginIdentifier(e.target.value)}
                     />
