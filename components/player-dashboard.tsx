@@ -6,6 +6,7 @@ import { PokeballIcon, PokeballSmall } from './pokeball-icon'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LogOut, Trophy, Target, Flame, Award, Users } from 'lucide-react'
+import Image from 'next/image'
 
 interface PlayerDashboardProps {
   onLogout: () => void
@@ -32,28 +33,20 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
         </div>
         
         <div className="container mx-auto px-4 relative">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <PokeballIcon size={36} />
-              <div>
-                <h1 className="text-xl md:text-2xl font-black tracking-wider">Tondo Battle LEAGUE</h1>
-                <p className="text-xs text-primary-foreground/70">Trainer Dashboard</p>
-              </div>
-            </div>
-            
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={() => {
-                logout()
-                onLogout()
-              }}
-              className="text-primary-foreground hover:bg-primary-foreground/10"
-            >
-              <LogOut className="w-4 h-4 mr-1" />
-              <span className="hidden sm:inline">Logout</span>
-            </Button>
-          </div>
+            <div className="flex flex-col items-center text-center">
+                      <PokeballIcon size={48} className="mb-4" />
+                      {/* Replaced H1 with the logo image */}
+                <div className="relative w-full max-w-[300px] md:max-w-[400px] aspect-[4/1]">
+                  <Image
+                    src="/Tondo-Battle.png" // Ensure this matches your filename in /public
+                    alt="Emerald Tondo Battle League"
+                    fill
+                    className="object-contain"
+                    priority
+                  />
+                </div>
+                      <h2 className="text-primary-foreground/80 mt-2">Official Trainer Registry</h2>
+                    </div>
         </div>
       </header>
       

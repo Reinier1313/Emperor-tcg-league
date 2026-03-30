@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ArrowLeft, Search, User, Award, Trophy, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import Image from 'next/image'
 
 interface PlayerDirectoryProps {
   onBack: () => void
@@ -62,10 +63,20 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <div>
-                <h1 className="text-xl md:text-2xl font-black tracking-wider">Tondo Battle LEAGUE</h1>
-                <p className="text-xs text-primary-foreground/70">Player Directory</p>
-              </div>
+               <div className="flex flex-col items-center text-center">
+                         <PokeballIcon size={48} className="mb-4" />
+                         {/* Replaced H1 with the logo image */}
+                   <div className="relative w-full max-w-[300px] md:max-w-[400px] aspect-[4/1]">
+                     <Image
+                       src="/Tondo-Battle.png" // Ensure this matches your filename in /public
+                       alt="Emerald Tondo Battle League"
+                       fill
+                       className="object-contain"
+                       priority
+                     />
+                   </div>
+                         <h2 className="text-primary-foreground/80 mt-2">Official Trainer Registry</h2>
+                       </div>
             </div>
             <PokeballIcon size={36} />
           </div>
