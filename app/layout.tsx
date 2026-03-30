@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Ronin League - TCG Trainer Registry',
+  title: 'Tondo Battle League - TCG Trainer Registry',
   description: 'Official digital trainer registry, ranking system, and player profile manager for Ronin League TCG',
   generator: 'v0.app',
   icons: {

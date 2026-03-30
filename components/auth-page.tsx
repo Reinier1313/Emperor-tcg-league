@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PokeballIcon } from './pokeball-icon'
 import { CheckCircle2, AlertCircle, User, Lock, IdCard, UserPlus, Shield } from 'lucide-react'
+import Image from 'next/image'
 
 interface AuthPageProps {
   onSuccess: () => void
@@ -108,8 +109,17 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
         <div className="container mx-auto px-4 relative">
           <div className="flex flex-col items-center text-center">
             <PokeballIcon size={48} className="mb-4" />
-            <h1 className="text-3xl md:text-4xl font-black tracking-wider">Tondo Battle LEAGUE</h1>
-            <p className="text-primary-foreground/80 mt-2">Official Trainer Registry</p>
+            {/* Replaced H1 with the logo image */}
+      <div className="relative w-full max-w-[300px] md:max-w-[400px] aspect-[4/1]">
+        <Image
+          src="/Tondo-Battle.png" // Ensure this matches your filename in /public
+          alt="Emerald Tondo Battle League"
+          fill
+          className="object-contain"
+          priority
+        />
+      </div>
+            <h2 className="text-primary-foreground/80 mt-2">Official Trainer Registry</h2>
           </div>
         </div>
       </header>
