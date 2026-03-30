@@ -161,7 +161,7 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
                     </Label>
                     <Input
                       id="login-identifier"
-                      placeholder="Enter trainer name or RL-XXXXX"
+                      placeholder="Enter trainer name or ID"
                       value={loginIdentifier}
                       onChange={(e) => setLoginIdentifier(e.target.value)}
                     />
@@ -213,7 +213,7 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
                       <Label htmlFor="firstName">First Name</Label>
                       <Input
                         id="firstName"
-                        placeholder="John"
+                        placeholder="Juan"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
                       />
@@ -222,7 +222,7 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
                       <Label htmlFor="lastName">Last Name</Label>
                       <Input
                         id="lastName"
-                        placeholder="Doe"
+                        placeholder="Dela Cruz"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
                       />
