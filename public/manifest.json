@@ -1,0 +1,86 @@
+{
+  "name": "Tondo Battle League",
+  "short_name": "TBL",
+  "description": "Official digital trainer registry and ranking system for Tondo Battle League TCG",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#DC2626",
+  "background_color": "#FFFFFF",
+  "categories": ["games", "entertainment"],
+  "screenshots": [
+    {
+      "src": "/Tondo-Battle.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "icons": [
+    {
+      "src": "/icon-light-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-dark-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Tondo-Battle.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Login",
+      "short_name": "Login",
+      "description": "Login to your trainer account",
+      "url": "/auth",
+      "icons": [
+        {
+          "src": "/icon-light-32x32.png",
+          "sizes": "32x32",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "description": "View your trainer dashboard",
+      "url": "/dashboard",
+      "icons": [
+        {
+          "src": "/icon-light-32x32.png",
+          "sizes": "32x32",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}
