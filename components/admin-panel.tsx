@@ -227,13 +227,12 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
             </div>
             <div className="flex items-center gap-3">
               <Button 
-                variant="ghost" 
+                variant="destructive" 
                 size="icon"
                 onClick={() => {
                   adminLogout()
                   onBack()
                 }}
-                className="h-10 w-10 text-accent-foreground hover:bg-accent-foreground/10"
                 title="Logout"
               >
                 <LogOut className="w-5 h-5" />
