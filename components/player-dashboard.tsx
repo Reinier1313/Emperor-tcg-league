@@ -1,11 +1,12 @@
 'use client'
 
 import { useLeagueStore } from '@/lib/store'
+import { usePwaInstall } from '@/hooks/use-pwa-install'
 import { TrainerCard } from './trainer-card'
 import { PokeballIcon, PokeballSmall } from './pokeball-icon'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { LogOut, Trophy, Target, Flame, Award, Users } from 'lucide-react'
+import { LogOut, Trophy, Target, Flame, Award, Users, Download } from 'lucide-react'
 import Image from 'next/image'
 
 interface PlayerDashboardProps {
@@ -15,6 +16,7 @@ interface PlayerDashboardProps {
 
 export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardProps) {
   const { currentUser, logout } = useLeagueStore()
+  const { isInstallable, install } = usePwaInstall()
   
   if (!currentUser) return null
   
@@ -63,17 +65,30 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
                 <PokeballSmall />
                 <span>{currentUser.id}</span>
               </div>
-              <Button 
-                variant="destructive" 
-                size="icon"
-                onClick={() => {
-                  logout()
-                  onLogout()
-                }}
-                title="Logout"
-              >
-                <LogOut className="w-5 h-5" />
-              </Button>
+              <div className="flex items-center gap-2">
+                {isInstallable && (
+                  <Button 
+                    variant="default" 
+                    size="icon"
+                    onClick={install}
+                    title="Add to your mobile"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Download className="w-5 h-5" />
+                  </Button>
+                )}
+                <Button 
+                  variant="destructive" 
+                  size="icon"
+                  onClick={() => {
+                    logout()
+                    onLogout()
+                  }}
+                  title="Logout"
+                >
+                  <LogOut className="w-5 h-5" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
