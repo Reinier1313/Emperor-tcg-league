@@ -58,9 +58,23 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
               <p className="text-sm text-muted-foreground">Welcome back,</p>
               <h2 className="text-2xl font-bold text-card-foreground">{currentUser.trainerName}</h2>
             </div>
-            <div className="flex items-center gap-1 text-sm font-mono text-muted-foreground">
-              <PokeballSmall />
-              <span>{currentUser.id}</span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1 text-sm font-mono text-muted-foreground">
+                <PokeballSmall />
+                <span>{currentUser.id}</span>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => {
+                  logout()
+                  onLogout()
+                }}
+                className="h-10 w-10 text-muted-foreground hover:text-card-foreground hover:bg-muted"
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5" />
+              </Button>
             </div>
           </div>
         </div>
