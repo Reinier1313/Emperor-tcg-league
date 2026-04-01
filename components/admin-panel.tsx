@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useLeagueStore, Player, Rank } from '@/lib/store'
+import { usePwaInstall } from '@/hooks/use-pwa-install'
 import { PokeballIcon, PokeballSmall } from './pokeball-icon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
   ArrowLeft, Search, User, Award, Settings, Save, 
-  CheckCircle2, Users, Shield, Lock, LogOut, Eye, EyeOff
+  CheckCircle2, Users, Shield, Lock, LogOut, Eye, EyeOff, Download
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -147,6 +148,7 @@ function AdminLogin({ onBack }: { onBack: () => void }) {
 
 export function AdminPanel({ onBack }: AdminPanelProps) {
   const { players, updatePlayerRank, updatePlayerStats, isAdminAuthenticated, adminLogout } = useLeagueStore()
+  const { isInstallable, install } = usePwaInstall()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
   const [editedRank, setEditedRank] = useState<Rank>('Beginner')
@@ -226,6 +228,17 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {isInstallable && (
+                <Button 
+                  variant="default" 
+                  size="icon"
+                  onClick={install}
+                  title="Add to your mobile"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <Download className="w-5 h-5" />
+                </Button>
+              )}
               <Button 
                 variant="ghost" 
                 size="icon"
@@ -233,7 +246,6 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
                   adminLogout()
                   onBack()
                 }}
-                className="h-10 w-10 text-accent-foreground hover:bg-accent-foreground/10"
                 title="Logout"
               >
                 <LogOut className="w-5 h-5" />

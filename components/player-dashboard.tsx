@@ -70,7 +70,6 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
                   logout()
                   onLogout()
                 }}
-                className="h-10 w-10 text-muted-foreground hover:text-card-foreground hover:bg-muted"
                 title="Logout"
               >
                 <LogOut className="w-5 h-5" />
@@ -78,7 +77,7 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
             </div>
           </div>
         </div>
-      </div>
+      </div>n mo
       
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
