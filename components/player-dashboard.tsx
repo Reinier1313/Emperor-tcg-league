@@ -77,7 +77,7 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
             </div>
           </div>
         </div>
-      </div>n mo
+      </div>
       
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
