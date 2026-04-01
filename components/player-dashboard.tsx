@@ -64,16 +64,16 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
                 <span>{currentUser.id}</span>
               </div>
               <Button 
-                variant="outline" 
-                size="sm"
+                variant="ghost" 
+                size="icon"
                 onClick={() => {
                   logout()
                   onLogout()
                 }}
-                className="gap-2"
+                className="h-10 w-10 text-muted-foreground hover:text-card-foreground hover:bg-muted"
+                title="Logout"
               >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Logout</span>
+                <LogOut className="w-5 h-5" />
               </Button>
             </div>
           </div>

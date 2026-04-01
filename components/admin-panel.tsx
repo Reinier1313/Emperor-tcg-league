@@ -228,15 +228,15 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
             <div className="flex items-center gap-3">
               <Button 
                 variant="ghost" 
-                size="sm"
+                size="icon"
                 onClick={() => {
                   adminLogout()
                   onBack()
                 }}
-                className="text-accent-foreground hover:bg-accent-foreground/10 gap-2"
+                className="h-10 w-10 text-accent-foreground hover:bg-accent-foreground/10"
+                title="Logout"
               >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Logout</span>
+                <LogOut className="w-5 h-5" />
               </Button>
               <PokeballIcon size={36} />
             </div>
