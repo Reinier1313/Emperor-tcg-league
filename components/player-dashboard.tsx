@@ -1,11 +1,12 @@
 'use client'
 
-import { useLeagueStore } from '@/lib/store'
+import { useLeagueStore, leagueRegions, rankThresholds, ApexRank, getRoleDisplayName, getRoleColor } from '@/lib/store'
 import { TrainerCard } from './trainer-card'
 import { PokeballIcon, PokeballSmall } from './pokeball-icon'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { LogOut, Trophy, Target, Flame, Award, Users } from 'lucide-react'
+import { LogOut, Trophy, Target, Flame, Award, Users, Zap, Shield } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
 interface PlayerDashboardProps {
@@ -13,14 +14,41 @@ interface PlayerDashboardProps {
   onViewDirectory: () => void
 }
 
+// Get rank icon/pokemon name
+const rankIcons: Record<ApexRank, string> = {
+  Rookie: 'Pikachu',
+  Ace: 'Eevee',
+  Rival: 'Lucario',
+  Elite: 'Gengar',
+  Veteran: 'Garchomp',
+  Dominator: 'Dragonite',
+  Supreme: 'Charizard X',
+  Apex: 'Rayquaza',
+  Ascended: 'Arceus',
+  Invictus: 'Eternatus',
+}
+
 export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardProps) {
-  const { currentUser, logout } = useLeagueStore()
+  const { currentUser, logout, isAdminAuthenticated } = useLeagueStore()
   
   if (!currentUser) return null
   
   const winRate = currentUser.wins + currentUser.losses > 0 
     ? Math.round((currentUser.wins / (currentUser.wins + currentUser.losses)) * 100) 
     : 0
+  
+  // Calculate progress to next rank
+  const ranks: ApexRank[] = ['Rookie', 'Ace', 'Rival', 'Elite', 'Veteran', 'Dominator', 'Supreme', 'Apex', 'Ascended', 'Invictus']
+  const currentRankIndex = ranks.indexOf(currentUser.apexRank)
+  const nextRank = currentRankIndex < ranks.length - 1 ? ranks[currentRankIndex + 1] : null
+  const nextRankBP = nextRank ? rankThresholds[nextRank] : null
+  const currentRankBP = rankThresholds[currentUser.apexRank]
+  const progressToNext = nextRankBP 
+    ? Math.min(100, Math.round(((currentUser.bp - currentRankBP) / (nextRankBP - currentRankBP)) * 100))
+    : 100
+  
+  const roleStyle = getRoleColor(currentUser.role)
+  const isStaff = currentUser.role !== 'user'
   
   return (
     <div className="min-h-screen bg-background">
@@ -33,20 +61,19 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
         </div>
         
         <div className="container mx-auto px-4 relative">
-            <div className="flex flex-col items-center text-center">
-                      <PokeballIcon size={48} className="mb-4" />
-                      {/* Replaced H1 with the logo image */}
-                <div className="relative w-full max-w-75 md:max-w-100 aspect-4/1">
-                  <Image
-                    src="/emperor-tcg.png" // Ensure this matches your filename in /public
-                    alt="Emperor TCG League"
-                    fill
-                    className="object-contain"
-                    priority
-                  />
-                </div>
-                      <h2 className="text-primary-foreground/80 mt-2">Official Trainer Registry</h2>
-                    </div>
+          <div className="flex flex-col items-center text-center">
+            <PokeballIcon size={48} className="mb-4" />
+            <div className="relative w-full max-w-75 md:max-w-100 aspect-4/1">
+              <Image
+                src="/emperor-tcg.png"
+                alt="Emperor TCG League"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+            <h2 className="text-primary-foreground/80 mt-2">Official Trainer Registry</h2>
+          </div>
         </div>
       </header>
       
@@ -55,7 +82,18 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Welcome back,</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-muted-foreground">Welcome back,</p>
+                {isStaff && (
+                  <span className={cn(
+                    'px-2 py-0.5 rounded-full text-[10px] font-semibold border',
+                    roleStyle.bg, roleStyle.text, roleStyle.border
+                  )}>
+                    <Shield className="w-3 h-3 inline mr-1" />
+                    {getRoleDisplayName(currentUser.role)}
+                  </span>
+                )}
+              </div>
               <h2 className="text-2xl font-bold text-card-foreground">{currentUser.trainerName}</h2>
             </div>
             <div className="flex items-center gap-4">
@@ -112,12 +150,49 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
               
               <Card className="bg-card">
                 <CardContent className="p-4 text-center">
-                  <Award className="w-6 h-6 mx-auto mb-2 text-primary" />
-                  <p className="text-2xl font-bold text-card-foreground">{winRate}%</p>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Win Rate</p>
+                  <Zap className="w-6 h-6 mx-auto mb-2 text-primary" />
+                  <p className="text-2xl font-bold text-card-foreground">{currentUser.bp}</p>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">BP</p>
                 </CardContent>
               </Card>
             </div>
+            
+            {/* Apex Rank Card */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Award className="w-5 h-5 text-primary" />
+                  Apex League Rank
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-black text-foreground">{currentUser.apexRank}</p>
+                    <p className="text-sm text-muted-foreground">{rankIcons[currentUser.apexRank]}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Battle Points</p>
+                    <p className="text-xl font-bold text-foreground">{currentUser.bp} BP</p>
+                  </div>
+                </div>
+                
+                {nextRank && (
+                  <div>
+                    <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                      <span>Progress to {nextRank}</span>
+                      <span>{currentUser.bp} / {nextRankBP} BP</span>
+                    </div>
+                    <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-primary transition-all duration-300"
+                        style={{ width: `${progressToNext}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
             
             {/* Trainer Info Card */}
             <Card>
@@ -140,10 +215,14 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
                   <span className="text-muted-foreground">Trainer ID</span>
                   <span className="font-mono text-card-foreground">{currentUser.id}</span>
                 </div>
+                <div className="flex justify-between items-center py-2 border-b border-border">
+                  <span className="text-muted-foreground">Current League</span>
+                  <span className="text-card-foreground">{leagueRegions[currentUser.currentLeague]}</span>
+                </div>
                 <div className="flex justify-between items-center py-2">
-                  <span className="text-muted-foreground">Current Rank</span>
+                  <span className="text-muted-foreground">Win Rate</span>
                   <span className="px-3 py-1 rounded-full text-sm font-semibold bg-primary/10 text-primary border border-primary/20">
-                    {currentUser.rank}
+                    {winRate}%
                   </span>
                 </div>
               </CardContent>

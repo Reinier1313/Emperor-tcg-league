@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useLeagueStore, Player, Rank } from '@/lib/store'
+import { useLeagueStore, Player, UserRole, ApexRank, LeagueStage, getRoleDisplayName, getRoleColor, canCRUDPlayers, canEditStats, leagueRegions } from '@/lib/store'
 import { usePwaInstall } from '@/hooks/use-pwa-install'
 import { PokeballIcon, PokeballSmall } from './pokeball-icon'
 import { Button } from '@/components/ui/button'
@@ -9,9 +9,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { 
   ArrowLeft, Search, User, Award, Settings, Save, 
-  CheckCircle2, Users, Shield, Lock, LogOut, Eye, EyeOff, Download
+  CheckCircle2, Users, Shield, Lock, LogOut, Eye, EyeOff, 
+  Download, Plus, Trash2, UserCog, Zap, Crown, AlertTriangle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -19,15 +21,9 @@ interface AdminPanelProps {
   onBack: () => void
 }
 
-const ranks: Rank[] = ['Beginner', 'Rookie', 'Elite', 'Master', 'Champion']
-
-const rankColors: Record<Rank, { bg: string; text: string; border: string }> = {
-  Beginner: { bg: 'bg-zinc-100', text: 'text-zinc-700', border: 'border-zinc-300' },
-  Rookie: { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-300' },
-  Elite: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300' },
-  Master: { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300' },
-  Champion: { bg: 'bg-primary/10', text: 'text-primary', border: 'border-primary/30' },
-}
+const roles: UserRole[] = ['user', 'moderator', 'admin', 'super_admin']
+const apexRanks: ApexRank[] = ['Rookie', 'Ace', 'Rival', 'Elite', 'Veteran', 'Dominator', 'Supreme', 'Apex', 'Ascended', 'Invictus']
+const leagueStages: LeagueStage[] = ['pokeball_1', 'pokeball_2', 'pokeball_3', 'greatball_1', 'greatball_2', 'greatball_3', 'ultraball_1', 'ultraball_2', 'ultraball_3', 'masterball']
 
 function AdminLogin({ onBack }: { onBack: () => void }) {
   const { adminLogin } = useLeagueStore()
@@ -42,7 +38,6 @@ function AdminLogin({ onBack }: { onBack: () => void }) {
     setIsLoading(true)
     setError('')
     
-    // Small delay for UX
     setTimeout(() => {
       const result = adminLogin(username, password)
       if (!result.success) {
@@ -146,57 +141,290 @@ function AdminLogin({ onBack }: { onBack: () => void }) {
   )
 }
 
+// Create Player Form Component
+function CreatePlayerForm({ currentUser, onSuccess }: { currentUser: Player; onSuccess: () => void }) {
+  const { createPlayer } = useLeagueStore()
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [trainerName, setTrainerName] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState<UserRole>('user')
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+  
+  // Available roles based on current user's role
+  const availableRoles: UserRole[] = currentUser.role === 'super_admin' 
+    ? ['user', 'moderator', 'admin']
+    : currentUser.role === 'admin'
+    ? ['user', 'moderator']
+    : ['user']
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    
+    const result = createPlayer({
+      firstName,
+      lastName,
+      trainerName,
+      password,
+      role,
+    }, currentUser.id)
+    
+    if (result.success) {
+      setSuccess(true)
+      setFirstName('')
+      setLastName('')
+      setTrainerName('')
+      setPassword('')
+      setRole('user')
+      setTimeout(() => {
+        setSuccess(false)
+        onSuccess()
+      }, 1500)
+    } else {
+      setError(result.message)
+    }
+  }
+  
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Plus className="w-5 h-5" />
+          Create New Player
+        </CardTitle>
+        <CardDescription>Add a new player to the league</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>First Name</Label>
+              <Input
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Enter first name"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Last Name</Label>
+              <Input
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Enter last name"
+                required
+              />
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Trainer Name</Label>
+            <Input
+              value={trainerName}
+              onChange={(e) => setTrainerName(e.target.value)}
+              placeholder="Enter trainer name"
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Password</Label>
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+              required
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label>Role</Label>
+            <Select value={role} onValueChange={(v) => setRole(v as UserRole)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {availableRoles.map((r) => (
+                  <SelectItem key={r} value={r}>
+                    {getRoleDisplayName(r)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {error && (
+            <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              {error}
+            </div>
+          )}
+          
+          {success && (
+            <div className="p-3 rounded-lg bg-emerald-100 border border-emerald-200 text-emerald-700 text-sm flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4" />
+              Player created successfully!
+            </div>
+          )}
+          
+          <Button type="submit" className="w-full gap-2">
+            <Plus className="w-4 h-4" />
+            Create Player
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  )
+}
+
 export function AdminPanel({ onBack }: AdminPanelProps) {
-  const { players, updatePlayerRank, updatePlayerStats, isAdminAuthenticated, adminLogout } = useLeagueStore()
+  const { 
+    players, 
+    currentUser,
+    updatePlayerStats, 
+    updatePlayerRole,
+    updatePlayerProfile,
+    deletePlayer,
+    addBP,
+    awardGymBadge,
+    isAdminAuthenticated, 
+    adminLogout 
+  } = useLeagueStore()
   const { isInstallable, install } = usePwaInstall()
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
-  const [editedRank, setEditedRank] = useState<Rank>('Beginner')
+  const [activeTab, setActiveTab] = useState('players')
+  
+  // Edit states
   const [editedWins, setEditedWins] = useState('')
   const [editedLosses, setEditedLosses] = useState('')
   const [editedStreak, setEditedStreak] = useState('')
+  const [editedBP, setEditedBP] = useState('')
+  const [editedRole, setEditedRole] = useState<UserRole>('user')
+  const [editedFirstName, setEditedFirstName] = useState('')
+  const [editedLastName, setEditedLastName] = useState('')
+  const [editedTrainerName, setEditedTrainerName] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
   
   // Show login screen if not authenticated
-  if (!isAdminAuthenticated) {
+  if (!isAdminAuthenticated || !currentUser) {
     return <AdminLogin onBack={onBack} />
   }
   
+  const canCRUD = canCRUDPlayers(currentUser.role)
+  const canEdit = canEditStats(currentUser.role)
+  const isSuperAdmin = currentUser.role === 'super_admin'
+  
   const filteredPlayers = players.filter(player => 
     player.trainerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    player.id.toLowerCase().includes(searchQuery.toLowerCase())
+    player.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    player.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    player.lastName.toLowerCase().includes(searchQuery.toLowerCase())
   )
   
   const handleSelectPlayer = (player: Player) => {
     setSelectedPlayer(player)
-    setEditedRank(player.rank)
     setEditedWins(player.wins.toString())
     setEditedLosses(player.losses.toString())
     setEditedStreak(player.streak.toString())
+    setEditedBP(player.bp.toString())
+    setEditedRole(player.role)
+    setEditedFirstName(player.firstName)
+    setEditedLastName(player.lastName)
+    setEditedTrainerName(player.trainerName)
     setSaveSuccess(false)
+    setDeleteConfirm(false)
   }
   
-  const handleSave = () => {
+  const handleSaveStats = () => {
     if (!selectedPlayer) return
     
     const wins = parseInt(editedWins) || 0
     const losses = parseInt(editedLosses) || 0
     const streak = parseInt(editedStreak) || 0
+    const bp = parseInt(editedBP) || 0
     
-    updatePlayerRank(selectedPlayer.id, editedRank)
-    updatePlayerStats(selectedPlayer.id, wins, losses, streak)
+    updatePlayerStats(selectedPlayer.id, { wins, losses, streak, bp })
     
-    // Update local selected player state
     setSelectedPlayer({
       ...selectedPlayer,
-      rank: editedRank,
       wins,
       losses,
-      streak
+      streak,
+      bp
     })
     
     setSaveSuccess(true)
     setTimeout(() => setSaveSuccess(false), 2000)
+  }
+  
+  const handleSaveProfile = () => {
+    if (!selectedPlayer) return
+    
+    updatePlayerProfile(selectedPlayer.id, {
+      firstName: editedFirstName,
+      lastName: editedLastName,
+      trainerName: editedTrainerName,
+    })
+    
+    setSelectedPlayer({
+      ...selectedPlayer,
+      firstName: editedFirstName,
+      lastName: editedLastName,
+      trainerName: editedTrainerName,
+    })
+    
+    setSaveSuccess(true)
+    setTimeout(() => setSaveSuccess(false), 2000)
+  }
+  
+  const handleSaveRole = () => {
+    if (!selectedPlayer) return
+    
+    const result = updatePlayerRole(selectedPlayer.id, editedRole, currentUser)
+    
+    if (result.success) {
+      setSelectedPlayer({
+        ...selectedPlayer,
+        role: editedRole
+      })
+      setSaveSuccess(true)
+      setTimeout(() => setSaveSuccess(false), 2000)
+    }
+  }
+  
+  const handleDeletePlayer = () => {
+    if (!selectedPlayer) return
+    
+    const result = deletePlayer(selectedPlayer.id, currentUser)
+    
+    if (result.success) {
+      setSelectedPlayer(null)
+      setDeleteConfirm(false)
+    }
+  }
+  
+  // Get available roles for assignment based on current user's role
+  const getAssignableRoles = (): UserRole[] => {
+    if (currentUser.role === 'super_admin') {
+      return ['user', 'moderator', 'admin']
+    }
+    if (currentUser.role === 'admin') {
+      return ['user', 'moderator']
+    }
+    return []
+  }
+  
+  // Check if current user can modify selected player
+  const canModifyPlayer = (player: Player): boolean => {
+    if (currentUser.role === 'super_admin') return true
+    if (player.role === 'super_admin') return false
+    if (currentUser.role === 'admin' && player.role !== 'admin') return true
+    if (currentUser.role === 'moderator' && player.role === 'user') return true
+    return false
   }
   
   return (
@@ -223,7 +451,18 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
                 <Shield className="w-6 h-6 text-primary" />
                 <div>
                   <h1 className="text-xl md:text-2xl font-black tracking-wider">ADMIN PANEL</h1>
-                  <p className="text-xs text-accent-foreground/70">Rank & Stats Management</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs text-accent-foreground/70">
+                      Logged in as {currentUser.trainerName}
+                    </p>
+                    <span className={cn(
+                      'px-1.5 py-0.5 rounded text-[10px] font-semibold',
+                      getRoleColor(currentUser.role).bg,
+                      getRoleColor(currentUser.role).text
+                    )}>
+                      {getRoleDisplayName(currentUser.role)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -258,188 +497,391 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
       
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Player List */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  All Players
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Search */}
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search players..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                
-                {/* Player List */}
-                <div className="space-y-2 max-h-[500px] overflow-y-auto">
-                  {filteredPlayers.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-4">No players found</p>
-                  ) : (
-                    filteredPlayers.map((player) => {
-                      const rankStyle = rankColors[player.rank]
-                      const isSelected = selectedPlayer?.id === player.id
-                      return (
-                        <button
-                          key={player.id}
-                          onClick={() => handleSelectPlayer(player)}
-                          className={cn(
-                            'w-full p-3 rounded-lg text-left transition-all',
-                            'border hover:border-primary/50',
-                            isSelected 
-                              ? 'bg-primary/5 border-primary' 
-                              : 'bg-card border-border hover:bg-muted/50'
-                          )}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                              <User className="w-5 h-5 text-muted-foreground" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-card-foreground truncate">
-                                {player.trainerName}
-                              </p>
-                              <p className="text-xs text-muted-foreground font-mono">
-                                {player.id}
-                              </p>
-                            </div>
-                            <span className={cn(
-                              'px-2 py-0.5 rounded-full text-xs font-semibold border shrink-0',
-                              rankStyle.bg, rankStyle.text, rankStyle.border
-                            )}>
-                              {player.rank}
-                            </span>
-                          </div>
-                        </button>
-                      )
-                    })
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="players" className="gap-2">
+              <Users className="w-4 h-4" />
+              Players
+            </TabsTrigger>
+            {canCRUD && (
+              <TabsTrigger value="create" className="gap-2">
+                <Plus className="w-4 h-4" />
+                Create
+              </TabsTrigger>
+            )}
+          </TabsList>
           
-          {/* Edit Panel */}
-          <div className="lg:col-span-2">
-            {selectedPlayer ? (
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
+          {/* Players Tab */}
+          <TabsContent value="players">
+            <div className="grid lg:grid-cols-3 gap-6">
+              {/* Player List */}
+              <div className="lg:col-span-1">
+                <Card>
+                  <CardHeader className="pb-3">
                     <CardTitle className="text-lg flex items-center gap-2">
-                      <Settings className="w-5 h-5" />
-                      Edit Player
+                      <Users className="w-5 h-5" />
+                      All Players ({players.length})
                     </CardTitle>
-                    {saveSuccess && (
-                      <span className="flex items-center gap-1 text-sm text-emerald-600">
-                        <CheckCircle2 className="w-4 h-4" />
-                        Saved!
-                      </span>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Search */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search players..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    
+                    {/* Player List */}
+                    <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                      {filteredPlayers.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-4">No players found</p>
+                      ) : (
+                        filteredPlayers.map((player) => {
+                          const roleStyle = getRoleColor(player.role)
+                          const isSelected = selectedPlayer?.id === player.id
+                          return (
+                            <button
+                              key={player.id}
+                              onClick={() => handleSelectPlayer(player)}
+                              className={cn(
+                                'w-full p-3 rounded-lg text-left transition-all',
+                                'border hover:border-primary/50',
+                                isSelected 
+                                  ? 'bg-primary/5 border-primary' 
+                                  : 'bg-card border-border hover:bg-muted/50'
+                              )}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                                  {player.role === 'super_admin' ? (
+                                    <Crown className="w-5 h-5 text-amber-500" />
+                                  ) : player.role === 'admin' ? (
+                                    <Shield className="w-5 h-5 text-purple-500" />
+                                  ) : player.role === 'moderator' ? (
+                                    <UserCog className="w-5 h-5 text-blue-500" />
+                                  ) : (
+                                    <User className="w-5 h-5 text-muted-foreground" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-semibold text-card-foreground truncate">
+                                    {player.trainerName}
+                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-xs text-muted-foreground font-mono">
+                                      {player.id}
+                                    </p>
+                                    <span className="text-xs text-muted-foreground">
+                                      {player.bp} BP
+                                    </span>
+                                  </div>
+                                </div>
+                                <span className={cn(
+                                  'px-2 py-0.5 rounded-full text-xs font-semibold border shrink-0',
+                                  roleStyle.bg, roleStyle.text, roleStyle.border
+                                )}>
+                                  {getRoleDisplayName(player.role)}
+                                </span>
+                              </div>
+                            </button>
+                          )
+                        })
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              {/* Edit Panel */}
+              <div className="lg:col-span-2">
+                {selectedPlayer ? (
+                  <div className="space-y-6">
+                    {/* Player Info Header */}
+                    <Card>
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-4">
+                          <div className={cn(
+                            'w-16 h-16 rounded-full flex items-center justify-center',
+                            getRoleColor(selectedPlayer.role).bg
+                          )}>
+                            {selectedPlayer.role === 'super_admin' ? (
+                              <Crown className="w-8 h-8 text-amber-600" />
+                            ) : selectedPlayer.role === 'admin' ? (
+                              <Shield className="w-8 h-8 text-purple-600" />
+                            ) : selectedPlayer.role === 'moderator' ? (
+                              <UserCog className="w-8 h-8 text-blue-600" />
+                            ) : (
+                              <User className="w-8 h-8 text-zinc-600" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-xl font-bold text-card-foreground">
+                                {selectedPlayer.trainerName}
+                              </h3>
+                              <span className={cn(
+                                'px-2 py-0.5 rounded-full text-xs font-semibold border',
+                                getRoleColor(selectedPlayer.role).bg,
+                                getRoleColor(selectedPlayer.role).text,
+                                getRoleColor(selectedPlayer.role).border
+                              )}>
+                                {getRoleDisplayName(selectedPlayer.role)}
+                              </span>
+                            </div>
+                            <p className="text-muted-foreground">
+                              {selectedPlayer.firstName} {selectedPlayer.lastName}
+                            </p>
+                            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                              <span className="font-mono flex items-center gap-1">
+                                <PokeballSmall />
+                                {selectedPlayer.id}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Zap className="w-4 h-4" />
+                                {selectedPlayer.bp} BP
+                              </span>
+                              <span>{selectedPlayer.apexRank}</span>
+                            </div>
+                          </div>
+                          {saveSuccess && (
+                            <span className="flex items-center gap-1 text-sm text-emerald-600">
+                              <CheckCircle2 className="w-4 h-4" />
+                              Saved!
+                            </span>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    {canModifyPlayer(selectedPlayer) ? (
+                      <div className="grid md:grid-cols-2 gap-6">
+                        {/* Stats Editing - Available to all staff */}
+                        {canEdit && (
+                          <Card>
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-base flex items-center gap-2">
+                                <Award className="w-4 h-4" />
+                                Edit Stats
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Wins</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={editedWins}
+                                    onChange={(e) => setEditedWins(e.target.value)}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Losses</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={editedLosses}
+                                    onChange={(e) => setEditedLosses(e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Streak</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={editedStreak}
+                                    onChange={(e) => setEditedStreak(e.target.value)}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Battle Points</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    value={editedBP}
+                                    onChange={(e) => setEditedBP(e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                              <Button onClick={handleSaveStats} className="w-full gap-2">
+                                <Save className="w-4 h-4" />
+                                Save Stats
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        )}
+                        
+                        {/* Profile Editing - Admins only */}
+                        {canCRUD && (
+                          <Card>
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-base flex items-center gap-2">
+                                <User className="w-4 h-4" />
+                                Edit Profile
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              <div className="space-y-2">
+                                <Label>First Name</Label>
+                                <Input
+                                  value={editedFirstName}
+                                  onChange={(e) => setEditedFirstName(e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Last Name</Label>
+                                <Input
+                                  value={editedLastName}
+                                  onChange={(e) => setEditedLastName(e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Trainer Name</Label>
+                                <Input
+                                  value={editedTrainerName}
+                                  onChange={(e) => setEditedTrainerName(e.target.value)}
+                                />
+                              </div>
+                              <Button onClick={handleSaveProfile} className="w-full gap-2">
+                                <Save className="w-4 h-4" />
+                                Save Profile
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        )}
+                        
+                        {/* Role Management - Super Admin and Admin only */}
+                        {canCRUD && selectedPlayer.role !== 'super_admin' && (
+                          <Card>
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-base flex items-center gap-2">
+                                <Shield className="w-4 h-4" />
+                                Manage Role
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              <div className="space-y-2">
+                                <Label>Role</Label>
+                                <Select value={editedRole} onValueChange={(v) => setEditedRole(v as UserRole)}>
+                                  <SelectTrigger>
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {getAssignableRoles().map((r) => (
+                                      <SelectItem key={r} value={r}>
+                                        {getRoleDisplayName(r)}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {currentUser.role === 'super_admin' 
+                                    ? 'Super Admin can assign any role except Super Admin'
+                                    : 'Admin can assign Moderator and User roles'}
+                                </p>
+                              </div>
+                              <Button onClick={handleSaveRole} className="w-full gap-2">
+                                <Save className="w-4 h-4" />
+                                Update Role
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        )}
+                        
+                        {/* Delete Player - Admins only */}
+                        {canCRUD && selectedPlayer.role !== 'super_admin' && selectedPlayer.id !== currentUser.id && (
+                          <Card className="border-destructive/30">
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-base flex items-center gap-2 text-destructive">
+                                <AlertTriangle className="w-4 h-4" />
+                                Danger Zone
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              {!deleteConfirm ? (
+                                <Button 
+                                  variant="destructive" 
+                                  className="w-full gap-2"
+                                  onClick={() => setDeleteConfirm(true)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                  Delete Player
+                                </Button>
+                              ) : (
+                                <div className="space-y-3">
+                                  <p className="text-sm text-destructive">
+                                    Are you sure? This action cannot be undone.
+                                  </p>
+                                  <div className="flex gap-2">
+                                    <Button 
+                                      variant="outline" 
+                                      className="flex-1"
+                                      onClick={() => setDeleteConfirm(false)}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button 
+                                      variant="destructive" 
+                                      className="flex-1 gap-2"
+                                      onClick={handleDeletePlayer}
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                      Confirm Delete
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        )}
+                      </div>
+                    ) : (
+                      <Card>
+                        <CardContent className="py-8 text-center">
+                          <Shield className="w-12 h-12 mx-auto mb-4 text-muted-foreground/30" />
+                          <h3 className="font-semibold text-card-foreground mb-2">
+                            Insufficient Permissions
+                          </h3>
+                          <p className="text-muted-foreground text-sm">
+                            You don&apos;t have permission to modify this player&apos;s information.
+                          </p>
+                        </CardContent>
+                      </Card>
                     )}
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Player Info (Read-only) */}
-                  <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-full bg-card border-2 border-primary/20 flex items-center justify-center">
-                        <User className="w-8 h-8 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold text-card-foreground">{selectedPlayer.trainerName}</h3>
-                        <p className="text-muted-foreground">{selectedPlayer.firstName} {selectedPlayer.lastName}</p>
-                        <p className="text-sm font-mono text-muted-foreground flex items-center gap-1 mt-1">
-                          <PokeballSmall />
-                          {selectedPlayer.id}
-                        </p>
-                      </div>
+                ) : (
+                  <Card className="h-full flex items-center justify-center min-h-[400px]">
+                    <div className="text-center p-8">
+                      <PokeballIcon size={64} className="mx-auto mb-4 opacity-20" />
+                      <h3 className="text-lg font-semibold text-card-foreground mb-2">Select a Player</h3>
+                      <p className="text-muted-foreground">
+                        Choose a player from the list to edit their information
+                      </p>
                     </div>
-                  </div>
-                  
-                  {/* Editable Fields */}
-                  <div className="grid sm:grid-cols-2 gap-6">
-                    {/* Rank */}
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Award className="w-4 h-4" />
-                        Rank
-                      </Label>
-                      <Select value={editedRank} onValueChange={(v) => setEditedRank(v as Rank)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ranks.map((rank) => (
-                            <SelectItem key={rank} value={rank}>
-                              {rank}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    {/* Wins */}
-                    <div className="space-y-2">
-                      <Label>Wins</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={editedWins}
-                        onChange={(e) => setEditedWins(e.target.value)}
-                      />
-                    </div>
-                    
-                    {/* Losses */}
-                    <div className="space-y-2">
-                      <Label>Losses</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={editedLosses}
-                        onChange={(e) => setEditedLosses(e.target.value)}
-                      />
-                    </div>
-                    
-                    {/* Win Streak */}
-                    <div className="space-y-2">
-                      <Label>Win Streak</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        value={editedStreak}
-                        onChange={(e) => setEditedStreak(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Save Button */}
-                  <Button onClick={handleSave} className="w-full gap-2">
-                    <Save className="w-4 h-4" />
-                    Save Changes
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="h-full flex items-center justify-center min-h-[400px]">
-                <div className="text-center p-8">
-                  <PokeballIcon size={64} className="mx-auto mb-4 opacity-20" />
-                  <h3 className="text-lg font-semibold text-card-foreground mb-2">Select a Player</h3>
-                  <p className="text-muted-foreground">
-                    Choose a player from the list to edit their rank and stats
-                  </p>
-                </div>
-              </Card>
-            )}
-          </div>
-        </div>
+                  </Card>
+                )}
+              </div>
+            </div>
+          </TabsContent>
+          
+          {/* Create Tab - Only for Admins */}
+          {canCRUD && (
+            <TabsContent value="create">
+              <div className="max-w-xl mx-auto">
+                <CreatePlayerForm 
+                  currentUser={currentUser} 
+                  onSuccess={() => setActiveTab('players')} 
+                />
+              </div>
+            </TabsContent>
+          )}
+        </Tabs>
       </main>
     </div>
   )
