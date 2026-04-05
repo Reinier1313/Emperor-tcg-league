@@ -68,8 +68,8 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
                          {/* Replaced H1 with the logo image */}
                    <div className="relative w-full max-w-[300px] md:max-w-[400px] aspect-[4/1]">
                      <Image
-                       src="/Tondo-Battle.png" // Ensure this matches your filename in /public
-                       alt="Emerald Tondo Battle League"
+                       src="/emperor-tcg.png" // Ensure this matches your filename in /public
+                       alt="Emperor TCG League"
                        fill
                        className="object-contain"
                        priority

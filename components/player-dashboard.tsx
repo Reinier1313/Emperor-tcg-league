@@ -36,10 +36,10 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
             <div className="flex flex-col items-center text-center">
                       <PokeballIcon size={48} className="mb-4" />
                       {/* Replaced H1 with the logo image */}
-                <div className="relative w-full max-w-[300px] md:max-w-[400px] aspect-[4/1]">
+                <div className="relative w-full max-w-75 md:max-w-100 aspect-4/1">
                   <Image
-                    src="/Tondo-Battle.png" // Ensure this matches your filename in /public
-                    alt="Emerald Tondo Battle League"
+                    src="/emperor-tcg.png" // Ensure this matches your filename in /public
+                    alt="Emperor TCG League"
                     fill
                     className="object-contain"
                     priority
