@@ -1,14 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { useLeagueStore, Player, Rank } from '@/lib/store'
+import { useLeagueStore, Player, ApexRank, getRoleDisplayName, getRoleColor } from '@/lib/store'
 import { PokeballIcon, PokeballSmall } from './pokeball-icon'
 import { TrainerCard } from './trainer-card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ArrowLeft, Search, User, Award, Trophy, X } from 'lucide-react'
+import { ArrowLeft, Search, User, Trophy, Zap, Shield, Crown, UserCog } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
@@ -16,12 +16,18 @@ interface PlayerDirectoryProps {
   onBack: () => void
 }
 
-const rankColors: Record<Rank, { bg: string; text: string; border: string }> = {
-  Beginner: { bg: 'bg-zinc-100', text: 'text-zinc-700', border: 'border-zinc-300' },
-  Rookie: { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-300' },
-  Elite: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300' },
-  Master: { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300' },
-  Champion: { bg: 'bg-primary/10', text: 'text-primary', border: 'border-primary/30' },
+// Rank colors for Apex League ranks
+const apexRankColors: Record<ApexRank, { bg: string; text: string; border: string }> = {
+  Rookie: { bg: 'bg-zinc-100', text: 'text-zinc-700', border: 'border-zinc-300' },
+  Ace: { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300' },
+  Rival: { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300' },
+  Elite: { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
+  Veteran: { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-300' },
+  Dominator: { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-300' },
+  Supreme: { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300' },
+  Apex: { bg: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-300' },
+  Ascended: { bg: 'bg-amber-200', text: 'text-amber-800', border: 'border-amber-400' },
+  Invictus: { bg: 'bg-rose-200', text: 'text-rose-800', border: 'border-rose-400' },
 }
 
 export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
@@ -35,11 +41,9 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
     `${player.firstName} ${player.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
   )
   
-  // Sort by rank and wins
+  // Sort by BP (highest first), then by wins
   const sortedPlayers = [...filteredPlayers].sort((a, b) => {
-    const rankOrder = ['Champion', 'Master', 'Elite', 'Rookie', 'Beginner']
-    const rankDiff = rankOrder.indexOf(a.rank) - rankOrder.indexOf(b.rank)
-    if (rankDiff !== 0) return rankDiff
+    if (b.bp !== a.bp) return b.bp - a.bp
     return b.wins - a.wins
   })
   
@@ -63,20 +67,19 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-               <div className="flex flex-col items-center text-center">
-                         <PokeballIcon size={48} className="mb-4" />
-                         {/* Replaced H1 with the logo image */}
-                   <div className="relative w-full max-w-[300px] md:max-w-[400px] aspect-[4/1]">
-                     <Image
-                       src="/emperor-tcg.png" // Ensure this matches your filename in /public
-                       alt="Emperor TCG League"
-                       fill
-                       className="object-contain"
-                       priority
-                     />
-                   </div>
-                         <h2 className="text-primary-foreground/80 mt-2">Official Trainer Registry</h2>
-                       </div>
+              <div className="flex flex-col items-center text-center">
+                <PokeballIcon size={48} className="mb-4" />
+                <div className="relative w-full max-w-[300px] md:max-w-[400px] aspect-[4/1]">
+                  <Image
+                    src="/emperor-tcg.png"
+                    alt="Emperor TCG League"
+                    fill
+                    className="object-contain"
+                    priority
+                  />
+                </div>
+                <h2 className="text-primary-foreground/80 mt-2">Official Trainer Registry</h2>
+              </div>
             </div>
             <PokeballIcon size={36} />
           </div>
@@ -121,8 +124,11 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {sortedPlayers.map((player) => {
-              const rankStyle = rankColors[player.rank]
+            {sortedPlayers.map((player, index) => {
+              const rankStyle = apexRankColors[player.apexRank]
+              const roleStyle = getRoleColor(player.role)
+              const isStaff = player.role !== 'user'
+              
               return (
                 <Card 
                   key={player.id}
@@ -130,13 +136,46 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
                   onClick={() => setSelectedPlayer(player)}
                 >
                   <CardContent className="p-4">
-                    {/* Top section with avatar and rank */}
+                    {/* Leaderboard position for top 3 */}
+                    {index < 3 && (
+                      <div className={cn(
+                        'absolute -top-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold',
+                        index === 0 && 'bg-amber-400 text-amber-900',
+                        index === 1 && 'bg-zinc-300 text-zinc-800',
+                        index === 2 && 'bg-amber-600 text-amber-100'
+                      )}>
+                        {index + 1}
+                      </div>
+                    )}
+                    
+                    {/* Top section with avatar and role */}
                     <div className="flex items-start gap-3 mb-3">
-                      <div className="w-12 h-12 rounded-full bg-muted border-2 border-primary/20 flex items-center justify-center shrink-0">
-                        <User className="w-6 h-6 text-muted-foreground" />
+                      <div className={cn(
+                        'w-12 h-12 rounded-full flex items-center justify-center shrink-0',
+                        isStaff ? roleStyle.bg : 'bg-muted border-2 border-primary/20'
+                      )}>
+                        {player.role === 'super_admin' ? (
+                          <Crown className="w-6 h-6 text-amber-600" />
+                        ) : player.role === 'admin' ? (
+                          <Shield className="w-6 h-6 text-purple-600" />
+                        ) : player.role === 'moderator' ? (
+                          <UserCog className="w-6 h-6 text-blue-600" />
+                        ) : (
+                          <User className="w-6 h-6 text-muted-foreground" />
+                        )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-card-foreground truncate">{player.trainerName}</h3>
+                        <div className="flex items-center gap-1">
+                          <h3 className="font-bold text-card-foreground truncate">{player.trainerName}</h3>
+                          {isStaff && (
+                            <span className={cn(
+                              'px-1 py-0.5 rounded text-[8px] font-semibold',
+                              roleStyle.bg, roleStyle.text
+                            )}>
+                              {getRoleDisplayName(player.role)}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground truncate">
                           {player.firstName} {player.lastName}
                         </p>
@@ -153,23 +192,30 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
                         'px-2 py-0.5 rounded-full text-xs font-semibold border',
                         rankStyle.bg, rankStyle.text, rankStyle.border
                       )}>
-                        {player.rank}
+                        {player.apexRank}
                       </span>
                     </div>
                     
                     {/* Stats */}
-                    <div className="grid grid-cols-3 gap-2 pt-3 border-t border-border">
+                    <div className="grid grid-cols-4 gap-1 pt-3 border-t border-border">
                       <div className="text-center">
                         <p className="text-sm font-bold text-card-foreground">{player.wins}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase">Wins</p>
+                        <p className="text-[9px] text-muted-foreground uppercase">Wins</p>
                       </div>
                       <div className="text-center">
                         <p className="text-sm font-bold text-card-foreground">{player.losses}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase">Losses</p>
+                        <p className="text-[9px] text-muted-foreground uppercase">Losses</p>
                       </div>
                       <div className="text-center">
                         <p className="text-sm font-bold text-card-foreground">{player.streak}</p>
-                        <p className="text-[10px] text-muted-foreground uppercase">Streak</p>
+                        <p className="text-[9px] text-muted-foreground uppercase">Streak</p>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-0.5">
+                          <Zap className="w-3 h-3 text-primary" />
+                          <p className="text-sm font-bold text-card-foreground">{player.bp}</p>
+                        </div>
+                        <p className="text-[9px] text-muted-foreground uppercase">BP</p>
                       </div>
                     </div>
                   </CardContent>
@@ -182,7 +228,7 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
       
       {/* Player Profile Modal */}
       <Dialog open={!!selectedPlayer} onOpenChange={() => setSelectedPlayer(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-primary" />
