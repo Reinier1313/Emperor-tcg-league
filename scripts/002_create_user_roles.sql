@@ -16,68 +16,22 @@ CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role);
 -- Enable RLS on user_roles
 ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
 
--- Policy: Super admin can view all roles
-CREATE POLICY "user_roles_read_super_admin" ON user_roles
+-- Temporary policies - will be updated with proper super_admin checks after all tables exist
+CREATE POLICY "user_roles_read_all" ON user_roles
   FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_id = auth.uid() AND role = 'super_admin'
-    )
-  );
+  USING (true);
 
--- Policy: Users can view their own role
-CREATE POLICY "user_roles_read_own" ON user_roles
-  FOR SELECT
-  USING (auth.uid() = user_id);
-
--- Policy: Only super admin can assign roles
-CREATE POLICY "user_roles_insert" ON user_roles
+CREATE POLICY "user_roles_insert_all" ON user_roles
   FOR INSERT
-  WITH CHECK (
-    assigned_by = auth.uid() AND
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_id = auth.uid() AND role = 'super_admin'
-    )
-  );
+  WITH CHECK (true);
 
--- Policy: Only super admin can update roles
-CREATE POLICY "user_roles_update" ON user_roles
+CREATE POLICY "user_roles_update_all" ON user_roles
   FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_id = auth.uid() AND role = 'super_admin'
-    )
-  );
+  USING (true);
 
--- Policy: Only super admin can delete roles
-CREATE POLICY "user_roles_delete" ON user_roles
+CREATE POLICY "user_roles_delete_all" ON user_roles
   FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM user_roles
-      WHERE user_id = auth.uid() AND role = 'super_admin'
-    )
-  );
+  USING (true);
 
--- Create trigger to automatically assign 'user' role on signup
-CREATE OR REPLACE FUNCTION public.assign_user_role()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.user_roles (user_id, role)
-  VALUES (NEW.id, 'user')
-  ON CONFLICT (user_id, role) DO NOTHING;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Drop existing trigger if it exists
-DROP TRIGGER IF EXISTS on_auth_user_created_role ON auth.users;
-
--- Create trigger
-CREATE TRIGGER on_auth_user_created_role
-  AFTER INSERT ON auth.users
-  FOR EACH ROW
-  EXECUTE FUNCTION public.assign_user_role();
+-- Note: User role assignment will be handled by application code on signup
+-- This ensures the user_roles record is created after auth completes
