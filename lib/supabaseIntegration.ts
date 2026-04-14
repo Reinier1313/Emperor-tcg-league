@@ -364,3 +364,81 @@ function createInitialEliteFourBadges() {
       earned: false,
     }))
 }
+
+// Request password reset
+export async function requestPasswordReset(email: string) {
+  try {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/reset-password`,
+    })
+
+    if (error) throw error
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+// Confirm password reset with new password
+export async function confirmPasswordReset(token: string, newPassword: string) {
+  try {
+    // Update password in Supabase Auth
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
+
+    if (error) throw error
+
+    // Get the current user to fetch their player record
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (sessionData.session?.user?.id) {
+      // Hash the password for our database
+      const hashedPassword = await bcryptjs.hash(newPassword, 10)
+
+      // Update the password in the players table as well
+      await supabase
+        .from('players')
+        .update({ password: hashedPassword })
+        .eq('user_id', sessionData.session.user.id)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+// Reset password with email link (Supabase OTP flow)
+export async function resetPasswordWithToken(token: string, newPassword: string) {
+  try {
+    // Exchange token for session
+    const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
+      token_hash: token,
+      type: 'recovery',
+    })
+
+    if (sessionError) throw sessionError
+
+    if (sessionData.session?.user?.id) {
+      // Update password in Supabase Auth
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      })
+
+      if (updateError) throw updateError
+
+      // Hash and update password in players table
+      const hashedPassword = await bcryptjs.hash(newPassword, 10)
+      await supabase
+        .from('players')
+        .update({ password: hashedPassword })
+        .eq('user_id', sessionData.session.user.id)
+
+      return { success: true }
+    }
+
+    return { success: false, error: 'Invalid token' }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

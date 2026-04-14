@@ -16,9 +16,10 @@ import Image from 'next/image'
 interface AuthPageProps {
   onSuccess: () => void
   onAdminLogin: () => void
+  onForgotPassword: () => void
 }
 
-export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
+export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPageProps) {
   const { register, login } = useLeagueStore()
   
   // Login state
@@ -244,6 +245,15 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
                     ) : (
                       'Enter League'
                     )}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="w-full text-primary hover:underline"
+                    onClick={onForgotPassword}
+                  >
+                    Forgot your password?
                   </Button>
                 </form>
               </TabsContent>
