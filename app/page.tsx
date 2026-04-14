@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useLeagueStore } from '@/lib/store'
 import { AuthPage } from '@/components/auth-page'
+import { ForgotPasswordPage } from '@/components/forgot-password-page'
 import { PlayerDashboard } from '@/components/player-dashboard'
 import { PlayerDirectory } from '@/components/player-directory'
 import { AdminPanel } from '@/components/admin-panel'
 
-type View = 'auth' | 'dashboard' | 'directory' | 'admin'
+type View = 'auth' | 'forgot-password' | 'dashboard' | 'directory' | 'admin'
 
 export default function Home() {
   const { currentUser, isAdminAuthenticated, adminLogout } = useLeagueStore()
@@ -38,7 +39,7 @@ export default function Home() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 rounded-full border-4 border-primary border-t-transparent animate-spin mx-auto mb-4" />
-          <p className="text-muted-foreground">Loading Tondo Battle League...</p>
+          <p className="text-muted-foreground">Loading Emeperor TCG League...</p>
         </div>
       </div>
     )
@@ -50,6 +51,16 @@ export default function Home() {
       <AuthPage 
         onSuccess={() => setCurrentView('dashboard')} 
         onAdminLogin={() => setCurrentView('admin')}
+        onForgotPassword={() => setCurrentView('forgot-password')}
+      />
+    )
+  }
+
+  // Forgot Password view
+  if (currentView === 'forgot-password') {
+    return (
+      <ForgotPasswordPage 
+        onBack={() => setCurrentView('auth')}
       />
     )
   }

@@ -1,3 +1,4 @@
+import bcryptjs from 'bcryptjs'
 import { supabase } from './supabaseClient'
 import { Player, UserRole, ApexRank, LeagueStage, EmperorTitle } from './store'
 
@@ -24,7 +25,7 @@ export interface SupabasePlayer {
   created_by?: string
 }
 
-// Register new player - FIXED TYPE
+// Register new player with hashed password
 export async function registerPlayerInSupabase(
   email: string,
   password: string,
@@ -48,6 +49,9 @@ export async function registerPlayerInSupabase(
     // Generate trainer ID
     const trainerId = generateTrainerId()
 
+    // Hash password before storing in database
+    const hashedPassword = await bcryptjs.hash(password, 10)
+
     // Create player record in database
     const { data: playerRecord, error: playerError } = await supabase
       .from('players')
@@ -57,7 +61,7 @@ export async function registerPlayerInSupabase(
           first_name: playerData.firstName,
           last_name: playerData.lastName,
           trainer_name: playerData.trainerName,
-          password: password, // Note: In production, never store plaintext passwords
+          password: hashedPassword,
           role: 'user' as UserRole,
           bp: 0,
           apex_rank: 'Rookie' as ApexRank,
@@ -82,27 +86,81 @@ export async function registerPlayerInSupabase(
   }
 }
 
-// Login player
-export async function loginPlayerInSupabase(email: string, password: string) {
+// Login player with support for email, trainer name, or trainer ID
+export async function loginPlayerInSupabase(identifier: string, password: string) {
   try {
-    // Authenticate with Supabase
+    let email: string | null = null
+    let playerData: any = null
+
+    // Check if identifier is an email
+    if (identifier.includes('@')) {
+      email = identifier
+    } else {
+      // Try to find player by trainer_name or trainer_id (ID format: ETL-XXXXX)
+      const { data: players, error: searchError } = await supabase
+        .from('players')
+        .select('*')
+        .or(`trainer_name.ilike.${identifier},trainer_id.ilike.${identifier}`)
+
+      if (!searchError && players && players.length > 0) {
+        playerData = players[0]
+        // Get email from Supabase Auth using user_id
+        const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(playerData.user_id)
+        if (!userError && user) {
+          email = user.email || null
+        }
+      }
+
+      if (!email && !playerData) {
+        throw new Error('Player not found')
+      }
+    }
+
+    // If we found the player but don't have email yet, get it from user_id
+    if (!email && playerData?.user_id) {
+      const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(playerData.user_id)
+      if (!userError && user) {
+        email = user.email || null
+      }
+    }
+
+    // If still no email, try authentication with the identifier as email
+    if (!email) {
+      email = identifier
+    }
+
+    // Authenticate with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
-    if (authError) throw authError
+    if (authError) {
+      // Auth failed - if we have player data, verify password hash manually
+      if (playerData) {
+        const passwordMatch = await bcryptjs.compare(password, playerData.password)
+        if (!passwordMatch) {
+          throw new Error('Invalid password')
+        }
+        // Password matches - return player data
+        return { success: true, player: playerData, isAdmin: playerData.role !== 'user' }
+      }
+      throw authError
+    }
 
     if (!authData.user) throw new Error('Failed to authenticate')
 
-    // Fetch player data from database
-    const { data: playerData, error: playerError } = await supabase
-      .from('players')
-      .select('*')
-      .eq('user_id', authData.user.id)
-      .single()
+    // Fetch player data if not already fetched
+    if (!playerData) {
+      const { data: fetchedPlayer, error: playerError } = await supabase
+        .from('players')
+        .select('*')
+        .eq('user_id', authData.user.id)
+        .single()
 
-    if (playerError) throw playerError
+      if (playerError) throw playerError
+      playerData = fetchedPlayer
+    }
 
     return { success: true, player: playerData, isAdmin: playerData.role !== 'user' }
   } catch (error: any) {
@@ -212,7 +270,7 @@ export async function deletePlayerFromSupabase(playerId: string) {
   }
 }
 
-// Create player (for admin)
+// Create player (for admin) with hashed password
 export async function createPlayerInSupabase(
   adminId: string,
   playerData: {
@@ -224,10 +282,10 @@ export async function createPlayerInSupabase(
   }
 ) {
   try {
-    // Note: In a real app, you might want to create an auth user too
-    // For now, we'll just create the player record
-
     const trainerId = generateTrainerId()
+
+    // Hash password before storing in database
+    const hashedPassword = await bcryptjs.hash(playerData.password, 10)
 
     const { data: playerRecord, error: playerError } = await supabase
       .from('players')
@@ -236,7 +294,7 @@ export async function createPlayerInSupabase(
           first_name: playerData.firstName,
           last_name: playerData.lastName,
           trainer_name: playerData.trainerName,
-          password: playerData.password,
+          password: hashedPassword,
           role: playerData.role,
           bp: 0,
           apex_rank: 'Rookie' as ApexRank,
@@ -305,4 +363,82 @@ function createInitialEliteFourBadges() {
       position: i + 1,
       earned: false,
     }))
+}
+
+// Request password reset
+export async function requestPasswordReset(email: string) {
+  try {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/reset-password`,
+    })
+
+    if (error) throw error
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+// Confirm password reset with new password
+export async function confirmPasswordReset(token: string, newPassword: string) {
+  try {
+    // Update password in Supabase Auth
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
+
+    if (error) throw error
+
+    // Get the current user to fetch their player record
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (sessionData.session?.user?.id) {
+      // Hash the password for our database
+      const hashedPassword = await bcryptjs.hash(newPassword, 10)
+
+      // Update the password in the players table as well
+      await supabase
+        .from('players')
+        .update({ password: hashedPassword })
+        .eq('user_id', sessionData.session.user.id)
+    }
+
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+// Reset password with email link (Supabase OTP flow)
+export async function resetPasswordWithToken(token: string, newPassword: string) {
+  try {
+    // Exchange token for session
+    const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
+      token_hash: token,
+      type: 'recovery',
+    })
+
+    if (sessionError) throw sessionError
+
+    if (sessionData.session?.user?.id) {
+      // Update password in Supabase Auth
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      })
+
+      if (updateError) throw updateError
+
+      // Hash and update password in players table
+      const hashedPassword = await bcryptjs.hash(newPassword, 10)
+      await supabase
+        .from('players')
+        .update({ password: hashedPassword })
+        .eq('user_id', sessionData.session.user.id)
+
+      return { success: true }
+    }
+
+    return { success: false, error: 'Invalid token' }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
 }
