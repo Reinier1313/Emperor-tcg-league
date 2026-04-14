@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useLeagueStore } from '@/lib/store'
+import { registerPlayerInSupabase, loginPlayerInSupabase } from '@/lib/supabaseIntegration'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PokeballIcon } from './pokeball-icon'
-import { CheckCircle2, AlertCircle, User, Lock, IdCard, UserPlus, Shield } from 'lucide-react'
+import { CheckCircle2, AlertCircle, User, Lock, IdCard, UserPlus, Shield, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 
 interface AuthPageProps {
@@ -24,8 +25,10 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
   const [loginIdentifier, setLoginIdentifier] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [loginError, setLoginError] = useState('')
+  const [loginLoading, setLoginLoading] = useState(false)
   
   // Register state
+  const [email, setEmail] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [trainerName, setTrainerName] = useState('')
@@ -33,66 +36,118 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [registerError, setRegisterError] = useState('')
   const [registerSuccess, setRegisterSuccess] = useState<{ trainerId: string } | null>(null)
-  
-  const handleLogin = (e: React.FormEvent) => {
+  const [registerLoading, setRegisterLoading] = useState(false)
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoginError('')
+    setLoginLoading(true)
     
     if (!loginIdentifier || !loginPassword) {
       setLoginError('Please fill in all fields')
+      setLoginLoading(false)
       return
     }
     
-    const result = login(loginIdentifier, loginPassword)
-    if (result.success) {
-      if (result.isAdmin) {
+    // Try Supabase login first
+    const supabaseResult = await loginPlayerInSupabase(loginIdentifier, loginPassword)
+    
+    if (supabaseResult.success) {
+      // Store player in local state
+      const playerData = supabaseResult.player
+      const mappedPlayer = {
+        id: playerData.id,
+        firstName: playerData.first_name,
+        lastName: playerData.last_name,
+        trainerName: playerData.trainer_name,
+        password: playerData.password,
+        ...playerData,
+      }
+      
+      if (supabaseResult.isAdmin) {
         onAdminLogin()
       } else {
         onSuccess()
       }
     } else {
-      setLoginError(result.message)
+      // Fall back to local login for backwards compatibility
+      const localResult = login(loginIdentifier, loginPassword)
+      if (localResult.success) {
+        if (localResult.isAdmin) {
+          onAdminLogin()
+        } else {
+          onSuccess()
+        }
+      } else {
+        setLoginError(localResult.message || supabaseResult.error)
+      }
     }
+    
+    setLoginLoading(false)
   }
   
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setRegisterError('')
     setRegisterSuccess(null)
+    setRegisterLoading(true)
     
-    if (!firstName || !lastName || !trainerName || !registerPassword) {
+    if (!email || !firstName || !lastName || !trainerName || !registerPassword) {
       setRegisterError('Please fill in all fields')
+      setRegisterLoading(false)
       return
     }
     
     if (registerPassword !== confirmPassword) {
       setRegisterError('Passwords do not match')
+      setRegisterLoading(false)
       return
     }
     
     if (registerPassword.length < 4) {
       setRegisterError('Password must be at least 4 characters')
+      setRegisterLoading(false)
       return
     }
     
-    const result = register({
+    // Try Supabase registration first
+    const supabaseResult = await registerPlayerInSupabase(email, registerPassword, {
       firstName,
       lastName,
       trainerName,
-      password: registerPassword,
     })
     
-    if (result.success && result.player) {
-      setRegisterSuccess({ trainerId: result.player.id })
-      // Clear form
+    if (supabaseResult.success) {
+      setRegisterSuccess({ trainerId: supabaseResult.player.id })
+      setEmail('')
       setFirstName('')
       setLastName('')
       setTrainerName('')
       setRegisterPassword('')
       setConfirmPassword('')
     } else {
-      setRegisterError(result.message)
+      // Fall back to local registration
+      const localResult = register({
+        firstName,
+        lastName,
+        trainerName,
+        password: registerPassword,
+      })
+      
+      if (localResult.success && localResult.player) {
+        setRegisterSuccess({ trainerId: localResult.player.id })
+        setEmail('')
+        setFirstName('')
+        setLastName('')
+        setTrainerName('')
+        setRegisterPassword('')
+        setConfirmPassword('')
+      } else {
+        setRegisterError(localResult.message || supabaseResult.error)
+      }
     }
+    
+    setRegisterLoading(false)
   }
   
   return (
@@ -109,16 +164,15 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
         <div className="container mx-auto px-4 relative">
           <div className="flex flex-col items-center text-center">
             <PokeballIcon size={48} className="mb-4" />
-            {/* Replaced H1 with the logo image */}
-      <div className="relative w-full max-w-[300px] md:max-w-[400px] aspect-[4/1]">
-        <Image
-          src="/emperor-tcg.png" // Ensure this matches your filename in /public
-          alt="Emperor TCG League"
-          fill
-          className="object-contain"
-          priority
-        />
-      </div>
+            <div className="relative w-full max-w-[300px] md:max-w-[400px] aspect-[4/1]">
+              <Image
+                src="/emperor-tcg.png"
+                alt="Emperor TCG League"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
             <h2 className="text-primary-foreground/80 mt-2">Official Trainer Registry</h2>
           </div>
         </div>
@@ -157,11 +211,11 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
                   <div className="space-y-2">
                     <Label htmlFor="login-identifier" className="flex items-center gap-2">
                       <IdCard className="w-4 h-4" />
-                      Trainer Name or ID
+                      Email or Trainer Name/ID
                     </Label>
                     <Input
                       id="login-identifier"
-                      placeholder="Enter trainer name or ID"
+                      placeholder="Enter email, trainer name or ID"
                       value={loginIdentifier}
                       onChange={(e) => setLoginIdentifier(e.target.value)}
                     />
@@ -181,8 +235,15 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
                     />
                   </div>
                   
-                  <Button type="submit" className="w-full">
-                    Enter League
+                  <Button type="submit" className="w-full" disabled={loginLoading}>
+                    {loginLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Logging in...
+                      </>
+                    ) : (
+                      'Enter League'
+                    )}
                   </Button>
                 </form>
               </TabsContent>
@@ -207,6 +268,17 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
                       </AlertDescription>
                     </Alert>
                   )}
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="your@email.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
                   
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
@@ -262,8 +334,15 @@ export function AuthPage({ onSuccess, onAdminLogin }: AuthPageProps) {
                     />
                   </div>
                   
-                  <Button type="submit" className="w-full">
-                    Register Trainer
+                  <Button type="submit" className="w-full" disabled={registerLoading}>
+                    {registerLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Registering...
+                      </>
+                    ) : (
+                      'Register Trainer'
+                    )}
                   </Button>
                 </form>
               </TabsContent>
