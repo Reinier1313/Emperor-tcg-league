@@ -368,8 +368,12 @@ function createInitialEliteFourBadges() {
 // Request password reset
 export async function requestPasswordReset(email: string) {
   try {
+    // Get the app URL from environment variable or default to window.location.origin
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 
+      (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')
+    
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/reset-password`,
+      redirectTo: `${appUrl}/reset-password`,
     })
 
     if (error) throw error
