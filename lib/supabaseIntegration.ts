@@ -1,31 +1,15 @@
 import bcryptjs from 'bcryptjs'
 import { supabase } from './supabaseClient'
-import { Player, UserRole, ApexRank, LeagueStage, EmperorTitle } from './store'
+import { Player, UserRole } from './store'
 
-// Type for database player record
-export interface SupabasePlayer {
-  id: string
-  user_id: string
-  first_name: string
-  last_name: string
-  trainer_name: string
-  password: string
-  role: UserRole
-  bp: number
-  apex_rank: ApexRank
-  wins: number
-  losses: number
-  streak: number
-  current_league: LeagueStage
-  gym_badges: Record<LeagueStage, any[]>
-  elite_four_badges: any[]
-  champion_badge: boolean
-  emperor_title: EmperorTitle | null
-  created_at: string
-  created_by?: string
-}
+// ============================================
+// REGISTRATION & AUTHENTICATION
+// ============================================
 
-// Register new player with hashed password
+/**
+ * Register a new player using Supabase Auth
+ * Creates auth user, player profile, user role, and progression data
+ */
 export async function registerPlayerInSupabase(
   email: string,
   password: string,
@@ -37,46 +21,29 @@ export async function registerPlayerInSupabase(
 ) {
   try {
     if (!supabase) {
-      return { success: false, error: 'Supabase not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.' }
+      return { success: false, error: 'Supabase not configured' }
     }
 
-    // Create auth user
+    // Step 1: Create auth user via Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
     })
 
     if (authError) throw authError
-
     if (!authData.user) throw new Error('Failed to create user')
 
-    // Generate trainer ID
-    const trainerId = generateTrainerId()
+    const userId = authData.user.id
 
-    // Hash password before storing in database
-    const hashedPassword = await bcryptjs.hash(password, 10)
-
-    // Create player record in database
+    // Step 2: Create player profile
     const { data: playerRecord, error: playerError } = await supabase
       .from('players')
       .insert([
         {
-          user_id: authData.user.id,
-          first_name: playerData.firstName,
-          last_name: playerData.lastName,
-          trainer_name: playerData.trainerName,
-          password: hashedPassword,
-          role: 'user' as UserRole,
-          bp: 0,
-          apex_rank: 'Rookie' as ApexRank,
-          wins: 0,
-          losses: 0,
-          streak: 0,
-          current_league: 'pokeball_1' as LeagueStage,
-          gym_badges: createInitialGymBadges(),
-          elite_four_badges: createInitialEliteFourBadges(),
-          champion_badge: false,
-          emperor_title: null,
+          user_id: userId,
+          username: playerData.trainerName,
+          email: email,
+          full_name: `${playerData.firstName} ${playerData.lastName}`,
         },
       ])
       .select()
@@ -84,57 +51,48 @@ export async function registerPlayerInSupabase(
 
     if (playerError) throw playerError
 
-    return { success: true, player: playerRecord, userId: authData.user.id }
+    // Step 3: Create user role (default to 'user')
+    const { error: roleError } = await supabase
+      .from('users_roles')
+      .insert([
+        {
+          user_id: userId,
+          role: 'user',
+          created_by: userId,
+        },
+      ])
+
+    if (roleError) throw roleError
+
+    // Step 4: Create player progression
+    const { error: progressionError } = await supabase
+      .from('player_progression')
+      .insert([
+        {
+          user_id: userId,
+        },
+      ])
+
+    if (progressionError) throw progressionError
+
+    return { 
+      success: true, 
+      player: playerRecord, 
+      userId,
+      trainerId: playerData.trainerName 
+    }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
 }
 
-// Login player with support for email, trainer name, or trainer ID
-export async function loginPlayerInSupabase(identifier: string, password: string) {
+/**
+ * Login player using email and password via Supabase Auth
+ */
+export async function loginPlayerInSupabase(email: string, password: string) {
   try {
     if (!supabase) {
-      return { success: false, error: 'Supabase not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.', isAdmin: false }
-    }
-
-    let email: string | null = null
-    let playerData: any = null
-
-    // Check if identifier is an email
-    if (identifier.includes('@')) {
-      email = identifier
-    } else {
-      // Try to find player by trainer_name or trainer_id (ID format: ETL-XXXXX)
-      const { data: players, error: searchError } = await supabase
-        .from('players')
-        .select('*')
-        .or(`trainer_name.ilike.${identifier},trainer_id.ilike.${identifier}`)
-
-      if (!searchError && players && players.length > 0) {
-        playerData = players[0]
-        // Get email from Supabase Auth using user_id
-        const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(playerData.user_id)
-        if (!userError && user) {
-          email = user.email || null
-        }
-      }
-
-      if (!email && !playerData) {
-        throw new Error('Player not found')
-      }
-    }
-
-    // If we found the player but don't have email yet, get it from user_id
-    if (!email && playerData?.user_id) {
-      const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(playerData.user_id)
-      if (!userError && user) {
-        email = user.email || null
-      }
-    }
-
-    // If still no email, try authentication with the identifier as email
-    if (!email) {
-      email = identifier
+      return { success: false, error: 'Supabase not configured', isAdmin: false, player: null }
     }
 
     // Authenticate with Supabase Auth
@@ -143,43 +101,61 @@ export async function loginPlayerInSupabase(identifier: string, password: string
       password,
     })
 
-    if (authError) {
-      // Auth failed - if we have player data, verify password hash manually
-      if (playerData) {
-        const passwordMatch = await bcryptjs.compare(password, playerData.password)
-        if (!passwordMatch) {
-          throw new Error('Invalid password')
-        }
-        // Password matches - return player data
-        return { success: true, player: playerData, isAdmin: playerData.role !== 'user' }
-      }
-      throw authError
+    if (authError) throw authError
+    if (!authData.user) throw new Error('Authentication failed')
+
+    const userId = authData.user.id
+
+    // Get player profile
+    const { data: playerData, error: playerError } = await supabase
+      .from('players')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    if (playerError) throw playerError
+
+    // Get user role
+    const { data: roleData, error: roleError } = await supabase
+      .from('users_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .single()
+
+    const userRole = roleData?.role || 'user'
+    const isAdmin = ['super_admin', 'admin', 'moderator'].includes(userRole)
+
+    // Get player progression
+    const { data: progressionData } = await supabase
+      .from('player_progression')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    const player = {
+      ...playerData,
+      role: userRole,
+      progression: progressionData,
     }
 
-    if (!authData.user) throw new Error('Failed to authenticate')
-
-    // Fetch player data if not already fetched
-    if (!playerData) {
-      const { data: fetchedPlayer, error: playerError } = await supabase
-        .from('players')
-        .select('*')
-        .eq('user_id', authData.user.id)
-        .single()
-
-      if (playerError) throw playerError
-      playerData = fetchedPlayer
+    return { 
+      success: true, 
+      player,
+      userId,
+      isAdmin,
     }
-
-    return { success: true, player: playerData, isAdmin: playerData.role !== 'user' }
   } catch (error: any) {
-    return { success: false, error: error.message, isAdmin: false }
+    return { success: false, error: error.message, isAdmin: false, player: null }
   }
 }
 
-// Logout
+/**
+ * Logout user from Supabase Auth
+ */
 export async function logoutFromSupabase() {
   try {
     if (!supabase) return { success: true }
+    
     const { error } = await supabase.auth.signOut()
     if (error) throw error
     return { success: true }
@@ -188,23 +164,41 @@ export async function logoutFromSupabase() {
   }
 }
 
-// Get current session
+/**
+ * Get current authenticated session
+ */
 export async function getCurrentSession() {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured', session: null }
+    
     const { data: { session }, error } = await supabase.auth.getSession()
     if (error) throw error
+    
     return { success: true, session }
   } catch (error: any) {
     return { success: false, error: error.message, session: null }
   }
 }
 
-// Fetch all players
+// ============================================
+// PLAYER MANAGEMENT
+// ============================================
+
+/**
+ * Fetch all players with their progression data
+ */
 export async function fetchPlayersFromSupabase() {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured', players: [] }
-    const { data, error } = await supabase.from('players').select('*')
+    
+    const { data, error } = await supabase
+      .from('players')
+      .select(`
+        *,
+        user_role:users_roles(role),
+        progression:player_progression(*)
+      `)
+
     if (error) throw error
     return { success: true, players: data || [] }
   } catch (error: any) {
@@ -212,38 +206,46 @@ export async function fetchPlayersFromSupabase() {
   }
 }
 
-// Update player stats in Supabase
-export async function updatePlayerStatsInSupabase(
-  playerId: string,
-  updates: { wins?: number; losses?: number; streak?: number; bp?: number }
-) {
+/**
+ * Fetch a specific player by user_id
+ */
+export async function fetchPlayerByUserId(userId: string) {
   try {
-    if (!supabase) return { success: false, error: 'Supabase not configured' }
+    if (!supabase) return { success: false, error: 'Supabase not configured', player: null }
+    
     const { data, error } = await supabase
       .from('players')
-      .update(updates)
-      .eq('id', playerId)
-      .select()
+      .select(`
+        *,
+        user_role:users_roles(role),
+        progression:player_progression(*),
+        badges:gym_badges(*),
+        battles:battle_history(*)
+      `)
+      .eq('user_id', userId)
       .single()
 
     if (error) throw error
     return { success: true, player: data }
   } catch (error: any) {
-    return { success: false, error: error.message }
+    return { success: false, error: error.message, player: null }
   }
 }
 
-// Update player profile in Supabase
+/**
+ * Update player profile information
+ */
 export async function updatePlayerProfileInSupabase(
-  playerId: string,
-  updates: { first_name?: string; last_name?: string; trainer_name?: string }
+  userId: string,
+  updates: { full_name?: string; username?: string }
 ) {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
+    
     const { data, error } = await supabase
       .from('players')
       .update(updates)
-      .eq('id', playerId)
+      .eq('user_id', userId)
       .select()
       .single()
 
@@ -254,29 +256,67 @@ export async function updatePlayerProfileInSupabase(
   }
 }
 
-// Update player role in Supabase
-export async function updatePlayerRoleInSupabase(playerId: string, role: UserRole) {
+/**
+ * Update player progression data
+ */
+export async function updatePlayerProgressionInSupabase(
+  userId: string,
+  updates: Partial<any>
+) {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
+    
     const { data, error } = await supabase
-      .from('players')
-      .update({ role })
-      .eq('id', playerId)
+      .from('player_progression')
+      .update(updates)
+      .eq('user_id', userId)
       .select()
       .single()
 
     if (error) throw error
-    return { success: true, player: data }
+    return { success: true, progression: data }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
 }
 
-// Delete player from Supabase
-export async function deletePlayerFromSupabase(playerId: string) {
+// ============================================
+// ADMIN FUNCTIONS
+// ============================================
+
+/**
+ * Update player role (admin only)
+ */
+export async function updatePlayerRoleInSupabase(userId: string, role: UserRole) {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
-    const { error } = await supabase.from('players').delete().eq('id', playerId)
+    
+    const { data, error } = await supabase
+      .from('users_roles')
+      .update({ role })
+      .eq('user_id', userId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return { success: true, role: data }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Delete player and all associated data
+ */
+export async function deletePlayerFromSupabase(userId: string) {
+  try {
+    if (!supabase) return { success: false, error: 'Supabase not configured' }
+    
+    // Delete from players table (cascades will handle other tables)
+    const { error } = await supabase
+      .from('players')
+      .delete()
+      .eq('user_id', userId)
 
     if (error) throw error
     return { success: true }
@@ -285,107 +325,128 @@ export async function deletePlayerFromSupabase(playerId: string) {
   }
 }
 
-// Create player (for admin) with hashed password
-export async function createPlayerInSupabase(
-  adminId: string,
-  playerData: {
-    firstName: string
-    lastName: string
-    trainerName: string
-    password: string
-    role: UserRole
-  }
+// ============================================
+// GYM BADGES & BATTLE TRACKING
+// ============================================
+
+/**
+ * Record a gym badge earned
+ */
+export async function recordGymBadgeInSupabase(
+  userId: string,
+  gymName: string,
+  stage: string
 ) {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
-    const trainerId = generateTrainerId()
-
-    // Hash password before storing in database
-    const hashedPassword = await bcryptjs.hash(playerData.password, 10)
-
-    const { data: playerRecord, error: playerError } = await supabase
-      .from('players')
+    
+    const { data, error } = await supabase
+      .from('gym_badges')
       .insert([
         {
-          first_name: playerData.firstName,
-          last_name: playerData.lastName,
-          trainer_name: playerData.trainerName,
-          password: hashedPassword,
-          role: playerData.role,
-          bp: 0,
-          apex_rank: 'Rookie' as ApexRank,
-          wins: 0,
-          losses: 0,
-          streak: 0,
-          current_league: 'pokeball_1' as LeagueStage,
-          gym_badges: createInitialGymBadges(),
-          elite_four_badges: createInitialEliteFourBadges(),
-          champion_badge: false,
-          emperor_title: null,
-          created_by: adminId,
+          user_id: userId,
+          gym_name: gymName,
+          stage: stage,
+          badge_earned: true,
         },
       ])
       .select()
       .single()
 
-    if (playerError) throw playerError
-
-    return { success: true, player: playerRecord }
+    if (error) throw error
+    return { success: true, badge: data }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
 }
 
-// Helper functions
-function generateTrainerId(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let result = 'ETL-'
-  for (let i = 0; i < 5; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
+/**
+ * Record a battle in history
+ */
+export async function recordBattleInSupabase(
+  userId: string,
+  battleData: {
+    opponent_type: string
+    opponent_name?: string
+    result: 'win' | 'loss' | 'draw'
+    battle_points_earned: number
   }
-  return result
+) {
+  try {
+    if (!supabase) return { success: false, error: 'Supabase not configured' }
+    
+    const { data, error } = await supabase
+      .from('battle_history')
+      .insert([
+        {
+          user_id: userId,
+          opponent_type: battleData.opponent_type,
+          opponent_name: battleData.opponent_name,
+          result: battleData.result,
+          battle_points_earned: battleData.battle_points_earned,
+        },
+      ])
+      .select()
+      .single()
+
+    if (error) throw error
+    return { success: true, battle: data }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
 }
 
-function createInitialGymBadges() {
-  const stages: LeagueStage[] = [
-    'pokeball_1',
-    'pokeball_2',
-    'pokeball_3',
-    'greatball_1',
-    'greatball_2',
-    'greatball_3',
-    'ultraball_1',
-    'ultraball_2',
-    'ultraball_3',
-    'masterball',
-  ]
-  const badges: Record<LeagueStage, any[]> = {} as Record<LeagueStage, any[]>
+/**
+ * Fetch battle history for a player
+ */
+export async function fetchBattleHistoryInSupabase(userId: string) {
+  try {
+    if (!supabase) return { success: false, error: 'Supabase not configured', battles: [] }
+    
+    const { data, error } = await supabase
+      .from('battle_history')
+      .select('*')
+      .eq('user_id', userId)
+      .order('battle_date', { ascending: false })
 
-  stages.forEach((stage) => {
-    badges[stage] = Array(8)
-      .fill(null)
-      .map(() => ({
-        earned: false,
-      }))
-  })
-
-  return badges
+    if (error) throw error
+    return { success: true, battles: data || [] }
+  } catch (error: any) {
+    return { success: false, error: error.message, battles: [] }
+  }
 }
 
-function createInitialEliteFourBadges() {
-  return Array(4)
-    .fill(null)
-    .map((_, i) => ({
-      position: i + 1,
-      earned: false,
-    }))
+/**
+ * Fetch gym badges for a player
+ */
+export async function fetchGymBadgesInSupabase(userId: string) {
+  try {
+    if (!supabase) return { success: false, error: 'Supabase not configured', badges: [] }
+    
+    const { data, error } = await supabase
+      .from('gym_badges')
+      .select('*')
+      .eq('user_id', userId)
+
+    if (error) throw error
+    return { success: true, badges: data || [] }
+  } catch (error: any) {
+    return { success: false, error: error.message, badges: [] }
+  }
 }
 
-// Request password reset
+// ============================================
+// PASSWORD MANAGEMENT
+// ============================================
+
+/**
+ * Request password reset via Supabase Auth
+ */
 export async function requestPasswordReset(email: string) {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
-    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/reset-password`,
     })
 
@@ -396,67 +457,19 @@ export async function requestPasswordReset(email: string) {
   }
 }
 
-// Confirm password reset with new password
-export async function confirmPasswordReset(token: string, newPassword: string) {
+/**
+ * Update user password
+ */
+export async function updatePassword(newPassword: string) {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
-    // Update password in Supabase Auth
-    const { data, error } = await supabase.auth.updateUser({
+    
+    const { error } = await supabase.auth.updateUser({
       password: newPassword,
     })
 
     if (error) throw error
-
-    // Get the current user to fetch their player record
-    const { data: sessionData } = await supabase.auth.getSession()
-    if (sessionData.session?.user?.id) {
-      // Hash the password for our database
-      const hashedPassword = await bcryptjs.hash(newPassword, 10)
-
-      // Update the password in the players table as well
-      await supabase
-        .from('players')
-        .update({ password: hashedPassword })
-        .eq('user_id', sessionData.session.user.id)
-    }
-
     return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message }
-  }
-}
-
-// Reset password with email link (Supabase OTP flow)
-export async function resetPasswordWithToken(token: string, newPassword: string) {
-  try {
-    if (!supabase) return { success: false, error: 'Supabase not configured' }
-    // Exchange token for session
-    const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
-      token_hash: token,
-      type: 'recovery',
-    })
-
-    if (sessionError) throw sessionError
-
-    if (sessionData.session?.user?.id) {
-      // Update password in Supabase Auth
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      })
-
-      if (updateError) throw updateError
-
-      // Hash and update password in players table
-      const hashedPassword = await bcryptjs.hash(newPassword, 10)
-      await supabase
-        .from('players')
-        .update({ password: hashedPassword })
-        .eq('user_id', sessionData.session.user.id)
-
-      return { success: true }
-    }
-
-    return { success: false, error: 'Invalid token' }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
