@@ -1,11 +1,21 @@
-'use client'
+import { Suspense } from 'react'
+import { ResetPasswordPageClient } from '@/components/reset-password-page-client'
 
-import { useSearchParams } from 'next/navigation'
-import { ResetPasswordPage } from '@/components/reset-password-page'
+function ResetPasswordLoading() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    </div>
+  )
+}
 
 export default function ResetPasswordRoute() {
-  const searchParams = useSearchParams()
-  const token = searchParams.get('token')
-
-  return <ResetPasswordPage token={token || undefined} />
+  return (
+    <Suspense fallback={<ResetPasswordLoading />}>
+      <ResetPasswordPageClient />
+    </Suspense>
+  )
 }
