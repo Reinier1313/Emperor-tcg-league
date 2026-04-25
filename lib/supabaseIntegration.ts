@@ -36,6 +36,10 @@ export async function registerPlayerInSupabase(
   }
 ) {
   try {
+    if (!supabase) {
+      return { success: false, error: 'Supabase not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.' }
+    }
+
     // Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -89,6 +93,10 @@ export async function registerPlayerInSupabase(
 // Login player with support for email, trainer name, or trainer ID
 export async function loginPlayerInSupabase(identifier: string, password: string) {
   try {
+    if (!supabase) {
+      return { success: false, error: 'Supabase not configured. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.', isAdmin: false }
+    }
+
     let email: string | null = null
     let playerData: any = null
 
@@ -171,6 +179,7 @@ export async function loginPlayerInSupabase(identifier: string, password: string
 // Logout
 export async function logoutFromSupabase() {
   try {
+    if (!supabase) return { success: true }
     const { error } = await supabase.auth.signOut()
     if (error) throw error
     return { success: true }
@@ -182,6 +191,7 @@ export async function logoutFromSupabase() {
 // Get current session
 export async function getCurrentSession() {
   try {
+    if (!supabase) return { success: false, error: 'Supabase not configured', session: null }
     const { data: { session }, error } = await supabase.auth.getSession()
     if (error) throw error
     return { success: true, session }
@@ -193,6 +203,7 @@ export async function getCurrentSession() {
 // Fetch all players
 export async function fetchPlayersFromSupabase() {
   try {
+    if (!supabase) return { success: false, error: 'Supabase not configured', players: [] }
     const { data, error } = await supabase.from('players').select('*')
     if (error) throw error
     return { success: true, players: data || [] }
@@ -207,6 +218,7 @@ export async function updatePlayerStatsInSupabase(
   updates: { wins?: number; losses?: number; streak?: number; bp?: number }
 ) {
   try {
+    if (!supabase) return { success: false, error: 'Supabase not configured' }
     const { data, error } = await supabase
       .from('players')
       .update(updates)
@@ -227,6 +239,7 @@ export async function updatePlayerProfileInSupabase(
   updates: { first_name?: string; last_name?: string; trainer_name?: string }
 ) {
   try {
+    if (!supabase) return { success: false, error: 'Supabase not configured' }
     const { data, error } = await supabase
       .from('players')
       .update(updates)
@@ -244,6 +257,7 @@ export async function updatePlayerProfileInSupabase(
 // Update player role in Supabase
 export async function updatePlayerRoleInSupabase(playerId: string, role: UserRole) {
   try {
+    if (!supabase) return { success: false, error: 'Supabase not configured' }
     const { data, error } = await supabase
       .from('players')
       .update({ role })
@@ -261,6 +275,7 @@ export async function updatePlayerRoleInSupabase(playerId: string, role: UserRol
 // Delete player from Supabase
 export async function deletePlayerFromSupabase(playerId: string) {
   try {
+    if (!supabase) return { success: false, error: 'Supabase not configured' }
     const { error } = await supabase.from('players').delete().eq('id', playerId)
 
     if (error) throw error
@@ -282,6 +297,7 @@ export async function createPlayerInSupabase(
   }
 ) {
   try {
+    if (!supabase) return { success: false, error: 'Supabase not configured' }
     const trainerId = generateTrainerId()
 
     // Hash password before storing in database
@@ -368,6 +384,7 @@ function createInitialEliteFourBadges() {
 // Request password reset
 export async function requestPasswordReset(email: string) {
   try {
+    if (!supabase) return { success: false, error: 'Supabase not configured' }
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/reset-password`,
     })
@@ -382,6 +399,7 @@ export async function requestPasswordReset(email: string) {
 // Confirm password reset with new password
 export async function confirmPasswordReset(token: string, newPassword: string) {
   try {
+    if (!supabase) return { success: false, error: 'Supabase not configured' }
     // Update password in Supabase Auth
     const { data, error } = await supabase.auth.updateUser({
       password: newPassword,
@@ -411,6 +429,7 @@ export async function confirmPasswordReset(token: string, newPassword: string) {
 // Reset password with email link (Supabase OTP flow)
 export async function resetPasswordWithToken(token: string, newPassword: string) {
   try {
+    if (!supabase) return { success: false, error: 'Supabase not configured' }
     // Exchange token for session
     const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
       token_hash: token,
