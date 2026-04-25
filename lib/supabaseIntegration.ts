@@ -1,31 +1,15 @@
 import bcryptjs from 'bcryptjs'
 import { supabase } from './supabaseClient'
-import { Player, UserRole, ApexRank, LeagueStage, EmperorTitle } from './store'
+import { Player, UserRole } from './store'
 
-// Type for database player record
-export interface SupabasePlayer {
-  id: string
-  user_id: string
-  first_name: string
-  last_name: string
-  trainer_name: string
-  password: string
-  role: UserRole
-  bp: number
-  apex_rank: ApexRank
-  wins: number
-  losses: number
-  streak: number
-  current_league: LeagueStage
-  gym_badges: Record<LeagueStage, any[]>
-  elite_four_badges: any[]
-  champion_badge: boolean
-  emperor_title: EmperorTitle | null
-  created_at: string
-  created_by?: string
-}
+// ============================================
+// REGISTRATION & AUTHENTICATION
+// ============================================
 
-// Register new player with hashed password
+/**
+ * Register a new player using Supabase Auth
+ * Creates auth user, player profile, user role, and progression data
+ */
 export async function registerPlayerInSupabase(
   email: string,
   password: string,

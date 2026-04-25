@@ -51,20 +51,11 @@ export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPage
     }
     
     // Try Supabase login first
+    // NEW CODE - Replace with this:
+    // Try Supabase login with email
     const supabaseResult = await loginPlayerInSupabase(loginIdentifier, loginPassword)
     
     if (supabaseResult.success) {
-      // Store player in local state
-      const playerData = supabaseResult.player
-      const mappedPlayer = {
-        id: playerData.id,
-        firstName: playerData.first_name,
-        lastName: playerData.last_name,
-        trainerName: playerData.trainer_name,
-        password: playerData.password,
-        ...playerData,
-      }
-      
       if (supabaseResult.isAdmin) {
         onAdminLogin()
       } else {
