@@ -96,7 +96,7 @@ export function PWAInstaller() {
             <div className="flex-1">
               <h3 className="font-semibold mb-2">Update Available</h3>
               <p className="text-sm mb-4">
-                A new version of Tondo Battle League is available. Refresh to get the latest features and improvements.
+                A new version of Emperor Batle League is available. Refresh to get the latest features and improvements.
               </p>
             </div>
             <button
