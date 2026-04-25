@@ -15,14 +15,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Tondo Battle League - TCG Trainer Registry',
+  title: 'Emperor TCG League - TCG Trainer Registry',
   description: 'Official digital trainer registry, ranking system, and player profile manager for Ronin League TCG',
   generator: 'v0.app',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Tondo Battle League',
+    title: 'Emperor TCG League',
   },
   formatDetection: {
     telephone: false,
