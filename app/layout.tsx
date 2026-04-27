@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Emperor TCG League - TCG Trainer Registry',
-  description: 'Official digital trainer registry, ranking system, and player profile manager for Ronin League TCG',
+  description: 'Official digital trainer registry, ranking system, and player profile manager for Emperor TCG League.',
   generator: 'v0.app',
   manifest: '/manifest.json',
   appleWebApp: {
