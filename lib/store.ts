@@ -224,51 +224,6 @@ export const useLeagueStore = create<LeagueStore>()(
       },
       
       login: (identifier, password) => {
-        // Check for super admin credentials
-        if (identifier === 'admin-rein' && password === 'Reinier121399!') {
-          // Create or find the super admin player
-          const { players } = get()
-          let superAdmin = players.find(p => p.role === 'super_admin' && p.trainerName === 'Emperor Rein')
-          
-          if (!superAdmin) {
-            // Create super admin player
-            superAdmin = {
-              id: 'ETL-ADMIN',
-              firstName: 'Reinier',
-              lastName: 'Admin',
-              trainerName: 'Emperor Rein',
-              password: password,
-              role: 'super_admin' as UserRole,
-              bp: 10000,
-              apexRank: 'Invictus' as ApexRank,
-              wins: 999,
-              losses: 0,
-              streak: 999,
-              currentLeague: 'masterball' as LeagueStage,
-              gymBadges: createInitialGymBadges(),
-              eliteFourBadges: createInitialEliteFourBadges(),
-              championBadge: true,
-              emperorTitle: 'master_emperor' as EmperorTitle,
-              createdAt: new Date().toISOString(),
-            }
-            // Mark all badges as earned for super admin
-            Object.keys(superAdmin.gymBadges).forEach(stage => {
-              superAdmin!.gymBadges[stage as LeagueStage].forEach(badge => {
-                badge.earned = true
-                badge.earnedAt = new Date().toISOString()
-              })
-            })
-            superAdmin.eliteFourBadges.forEach(badge => {
-              badge.earned = true
-              badge.earnedAt = new Date().toISOString()
-            })
-            set({ players: [...players, superAdmin] })
-          }
-          
-          set({ isAdminAuthenticated: true, currentUser: superAdmin })
-          return { success: true, message: 'Super Admin login successful', isAdmin: true }
-        }
-        
         const { players } = get()
         
         // Find player by trainer name or ID
@@ -297,9 +252,11 @@ export const useLeagueStore = create<LeagueStore>()(
       },
       
       adminLogin: (username, password) => {
-        if (username === 'admin-rein' && password === 'Reinier121399!') {
-          const result = get().login(username, password)
-          return { success: result.success, message: result.success ? 'Admin access granted' : result.message }
+        // Admin login is now handled via Supabase Auth
+        // This local fallback checks the players store for backwards compatibility
+        const result = get().login(username, password)
+        if (result.success && result.isAdmin) {
+          return { success: true, message: 'Admin access granted' }
         }
         return { success: false, message: 'Invalid admin credentials' }
       },

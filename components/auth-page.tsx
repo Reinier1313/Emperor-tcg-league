@@ -20,7 +20,7 @@ interface AuthPageProps {
 }
 
 export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPageProps) {
-  const { register, login } = useLeagueStore()
+  const { } = useLeagueStore()
   
   // Login state
   const [loginIdentifier, setLoginIdentifier] = useState('')
@@ -50,11 +50,8 @@ export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPage
       return
     }
     
-    // Try Supabase login first
-    // NEW CODE - Replace with this:
-    // Try Supabase login with email
     const supabaseResult = await loginPlayerInSupabase(loginIdentifier, loginPassword)
-    
+
     if (supabaseResult.success) {
       if (supabaseResult.isAdmin) {
         onAdminLogin()
@@ -62,17 +59,7 @@ export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPage
         onSuccess()
       }
     } else {
-      // Fall back to local login for backwards compatibility
-      const localResult = login(loginIdentifier, loginPassword)
-      if (localResult.success) {
-        if (localResult.isAdmin) {
-          onAdminLogin()
-        } else {
-          onSuccess()
-        }
-      } else {
-        setLoginError(localResult.message || supabaseResult.error)
-      }
+      setLoginError(supabaseResult.error || 'Invalid email or password')
     }
     
     setLoginLoading(false)
@@ -102,15 +89,16 @@ export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPage
       return
     }
     
-    // Try Supabase registration first
     const supabaseResult = await registerPlayerInSupabase(email, registerPassword, {
       firstName,
       lastName,
       trainerName,
     })
     
-    if (supabaseResult.success) {
-      setRegisterSuccess({ trainerId: supabaseResult.player.id })
+    const trainerId = supabaseResult.trainerId
+
+    if (supabaseResult.success && trainerId) {
+      setRegisterSuccess({ trainerId })
       setEmail('')
       setFirstName('')
       setLastName('')
@@ -118,25 +106,7 @@ export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPage
       setRegisterPassword('')
       setConfirmPassword('')
     } else {
-      // Fall back to local registration
-      const localResult = register({
-        firstName,
-        lastName,
-        trainerName,
-        password: registerPassword,
-      })
-      
-      if (localResult.success && localResult.player) {
-        setRegisterSuccess({ trainerId: localResult.player.id })
-        setEmail('')
-        setFirstName('')
-        setLastName('')
-        setTrainerName('')
-        setRegisterPassword('')
-        setConfirmPassword('')
-      } else {
-        setRegisterError(localResult.message || supabaseResult.error)
-      }
+      setRegisterError(supabaseResult.error || 'Registration failed. Please try again.')
     }
     
     setRegisterLoading(false)

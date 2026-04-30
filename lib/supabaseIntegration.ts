@@ -1,4 +1,3 @@
-import bcryptjs from 'bcryptjs'
 import { supabase } from './supabaseClient'
 import { Player, UserRole } from './store'
 
