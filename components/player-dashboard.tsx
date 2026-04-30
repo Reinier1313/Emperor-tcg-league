@@ -1,13 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import { useLeagueStore, leagueRegions, rankThresholds, ApexRank, getRoleDisplayName, getRoleColor } from '@/lib/store'
 import { TrainerCard } from './trainer-card'
 import { PokeballIcon, PokeballSmall } from './pokeball-icon'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { LogOut, Trophy, Target, Flame, Award, Users, Zap, Shield } from 'lucide-react'
+import { LogOut, Trophy, Target, Flame, Award, Users, Zap, Shield, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
+import { AccountSettingsPage } from './account-settings-page'
 
 interface PlayerDashboardProps {
   onLogout: () => void
@@ -30,8 +32,13 @@ const rankIcons: Record<ApexRank, string> = {
 
 export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardProps) {
   const { currentUser, logout, isAdminAuthenticated } = useLeagueStore()
-  
+  const [showSettings, setShowSettings] = useState(false)
+
   if (!currentUser) return null
+
+  if (showSettings) {
+    return <AccountSettingsPage onBack={() => setShowSettings(false)} />
+  }
   
   const winRate = currentUser.wins + currentUser.losses > 0 
     ? Math.round((currentUser.wins / (currentUser.wins + currentUser.losses)) * 100) 
@@ -236,6 +243,15 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
             >
               <Users className="w-6 h-6" />
               <span>Player Directory</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full h-auto py-4 flex flex-col gap-2"
+              onClick={() => setShowSettings(true)}
+            >
+              <Settings className="w-6 h-6" />
+              <span>Account Settings</span>
             </Button>
           </div>
           

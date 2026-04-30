@@ -68,6 +68,7 @@ export interface EliteFourBadge {
 }
 
 export interface Player {
+  email: string
   id: string
   firstName: string
   lastName: string

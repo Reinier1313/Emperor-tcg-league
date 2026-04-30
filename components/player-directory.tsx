@@ -99,6 +99,8 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
             />
           </div>
         </div>
+
+        
       </div>
       
       {/* Main Content */}

@@ -169,6 +169,7 @@ function CreatePlayerForm({ currentUser, onSuccess }: { currentUser: Player; onS
       trainerName,
       password,
       role,
+      email: ''
     }, currentUser.id)
     
     if (result.success) {
