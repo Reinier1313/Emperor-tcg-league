@@ -254,6 +254,20 @@ export const useLeagueStore = create<LeagueStore>()(
       },
       
       setCurrentUserFromSupabase: (supabasePlayer) => {
+        // Initialize gymBadges with all league stages
+        const gymBadges: Record<LeagueStage, GymBadge[]> = {
+          pokeball_1: [],
+          pokeball_2: [],
+          pokeball_3: [],
+          greatball_1: [],
+          greatball_2: [],
+          greatball_3: [],
+          ultraball_1: [],
+          ultraball_2: [],
+          ultraball_3: [],
+          masterball: [],
+        }
+        
         // Convert Supabase player data to local Player format
         const player: Player = {
           id: supabasePlayer.id || '',
@@ -269,7 +283,7 @@ export const useLeagueStore = create<LeagueStore>()(
           losses: 0,
           streak: 0,
           currentLeague: 'pokeball_1' as LeagueStage,
-          gymBadges: {},
+          gymBadges,
           eliteFourBadges: [],
           championBadge: false,
           emperorTitle: null,
