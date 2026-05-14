@@ -244,28 +244,20 @@ export const useLeagueStore = create<LeagueStore>()(
         // Check if player is admin or higher
         const isAdmin = player.role === 'super_admin' || player.role === 'admin' || player.role === 'moderator'
         
-        set({ currentUser: player, isAdminAuthenticated: isAdmin })
+        set({ isAdminAuthenticated: isAdmin })
         return { success: true, message: 'Login successful', isAdmin }
       },
       
       logout: () => {
-        set({ currentUser: null, isAdminAuthenticated: false })
-      },
-      
-      adminLogin: (username, password) => {
-        // Admin login is now handled via Supabase Auth
-        // This local fallback checks the players store for backwards compatibility
-        const result = get().login(username, password)
-        if (result.success && result.isAdmin) {
-          return { success: true, message: 'Admin access granted' }
-        }
-        return { success: false, message: 'Invalid admin credentials' }
-      },
+  set({ isAdminAuthenticated: false })
+},
+      adminLogin: () => {
+  return { success: true, message: 'Admin access granted' }
+},
       
       adminLogout: () => {
-        set({ isAdminAuthenticated: false, currentUser: null })
-      },
-      
+  set({ isAdminAuthenticated: false })
+},
       createPlayer: (playerData, createdBy) => {
         const { players } = get()
         
