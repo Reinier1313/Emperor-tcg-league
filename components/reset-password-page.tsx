@@ -17,7 +17,7 @@ interface ResetPasswordPageProps {
 }
 
 export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
-  const [step, setStep] = useState<'password' | 'success' | 'error'>('password')
+  const [step, setStep] = useState<'loading' | 'password' | 'success' | 'error'>('loading')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -26,27 +26,42 @@ export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
   const [loading, setLoading] = useState(false)
   const [tokenError, setTokenError] = useState('')
 
-  // Check if we have a valid Supabase session (Supabase automatically handles the token)
+  // Listen for Supabase to exchange the hash fragment token (PASSWORD_RECOVERY event)
   useEffect(() => {
-    const checkSession = async () => {
-      if (!supabase) {
-        setTokenError('Supabase not configured. Please try again later.')
-        setStep('error')
-        return
-      }
+    if (!supabase) {
+      setTokenError('Supabase not configured. Please try again later.')
+      setStep('error')
+      return
+    }
 
-      // Supabase auth recovery token is automatically handled via the URL fragment
-      // If the user accessed this page via the reset email link, Supabase will have
-      // automatically loaded the session into auth
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
-      if (sessionError || !session) {
+    // Supabase fires PASSWORD_RECOVERY once it has successfully exchanged the
+    // access_token from the URL hash fragment. We must listen for this event
+    // rather than calling getSession() immediately, because the exchange is async.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event: string, session: any) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          // Token exchanged — allow the user to set a new password
+          setStep('password')
+        } else if (event === 'SIGNED_IN' && session) {
+          // Some Supabase versions emit SIGNED_IN instead of PASSWORD_RECOVERY
+          setStep('password')
+        }
+      }
+    )
+
+    // Fallback: give Supabase up to 3s to fire the event, then check session directly
+    const timeout = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
         setTokenError('Invalid or expired reset link. Please request a new password reset.')
         setStep('error')
       }
-    }
+    }, 3000)
 
-    checkSession()
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
+    }
   }, [])
 
   // Validate password strength
@@ -108,6 +123,19 @@ export function ResetPasswordPage({ token }: ResetPasswordPageProps) {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (step === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardContent className="flex flex-col items-center gap-4 py-10">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Verifying reset link…</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   if (step === 'error') {
