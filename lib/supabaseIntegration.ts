@@ -38,6 +38,21 @@ export async function registerPlayerInSupabase(
       return { success: false, error: 'Username already taken' }
     }
 
+    // Step 0b: Check if email already exists
+    const { data: existingEmail, error: emailCheckError } = await supabase
+      .from('players')
+      .select('id')
+      .ilike('email', email)
+      .single()
+
+    if (emailCheckError && emailCheckError.code !== 'PGRST116') { // PGRST116 = no rows found
+      throw emailCheckError
+    }
+
+    if (existingEmail) {
+      return { success: false, error: 'Email already exists' }
+    }
+
     // Step 1: Create auth user via Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
