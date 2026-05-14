@@ -72,7 +72,6 @@ export async function registerPlayerInSupabase(
         {
           user_id: userId,
           role: 'user',
-          created_by: userId,
         },
       ])
 
