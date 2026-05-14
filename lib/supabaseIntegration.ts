@@ -23,6 +23,21 @@ export async function registerPlayerInSupabase(
       return { success: false, error: 'Supabase not configured' }
     }
 
+    // Step 0: Check if username already exists
+    const { data: existingPlayer, error: checkError } = await supabase
+      .from('players')
+      .select('id')
+      .ilike('username', playerData.trainerName)
+      .single()
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
+      throw checkError
+    }
+
+    if (existingPlayer) {
+      return { success: false, error: 'Username already taken' }
+    }
+
     // Step 1: Create auth user via Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
