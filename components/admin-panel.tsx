@@ -282,21 +282,23 @@ function CreatePlayerForm({ currentUser, onSuccess }: { currentUser: Player; onS
 
 export function AdminPanel({ onBack }: AdminPanelProps) {
   const { 
-  players, 
-  currentUser,
-  updatePlayerStats, 
-  updatePlayerRole,
-  updatePlayerProfile,
-  deletePlayer,
-  addBP,
-  awardGymBadge,
-  adminLogout 
-} = useLeagueStore()
+    players, 
+    currentUser,
+    updatePlayerStats, 
+    updatePlayerRole,
+    updatePlayerProfile,
+    deletePlayer,
+    addBP,
+    awardGymBadge,
+    adminLogout 
+  } = useLeagueStore()
+
   const { isInstallable, install } = usePwaInstall()
+
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
   const [activeTab, setActiveTab] = useState('players')
-  
+
   // Edit states
   const [editedWins, setEditedWins] = useState('')
   const [editedLosses, setEditedLosses] = useState('')
@@ -308,16 +310,16 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
   const [editedTrainerName, setEditedTrainerName] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
-  
-  // Use Supabase/currentUser role authentication only
-const hasAdminAccess =
-  currentUser &&
-  ['admin', 'super_admin'].includes(currentUser.role)
 
-if (!hasAdminAccess) {
-  return <AdminLogin onBack={onBack} />
-}
-  
+  // Use Supabase/currentUser role authentication only
+  const hasAdminAccess =
+    currentUser &&
+    ['admin', 'super_admin'].includes(currentUser.role)
+
+  if (!hasAdminAccess) {
+    return <AdminLogin onBack={onBack} />
+  }
+
   const canCRUD = canCRUDPlayers(currentUser.role)
   const canEdit = canEditStats(currentUser.role)
   const isSuperAdmin = currentUser.role === 'super_admin'
