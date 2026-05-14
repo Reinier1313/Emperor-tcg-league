@@ -20,7 +20,7 @@ interface AuthPageProps {
 }
 
 export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPageProps) {
-  const { } = useLeagueStore()
+  const { setCurrentUserFromSupabase } = useLeagueStore()
   
   // Login state
   const [loginIdentifier, setLoginIdentifier] = useState('')
@@ -52,12 +52,12 @@ export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPage
     
     const supabaseResult = await loginPlayerInSupabase(loginIdentifier, loginPassword)
 
-    if (supabaseResult.success) {
-      if (supabaseResult.isAdmin) {
-        onAdminLogin()
-      } else {
-        onSuccess()
-      }
+    if (supabaseResult.success && supabaseResult.player) {
+      // Update store with Supabase player data
+      setCurrentUserFromSupabase(supabaseResult.player)
+      // Both admin and regular users go to onSuccess
+      // The page routing will check user role and route appropriately
+      onSuccess()
     } else {
       setLoginError(supabaseResult.error || 'Invalid email or password')
     }

@@ -104,6 +104,7 @@ interface LeagueStore {
   // Auth actions
   register: (player: Omit<Player, 'id' | 'role' | 'bp' | 'apexRank' | 'wins' | 'losses' | 'streak' | 'currentLeague' | 'gymBadges' | 'eliteFourBadges' | 'championBadge' | 'emperorTitle' | 'createdAt'>) => { success: boolean; message: string; player?: Player }
   login: (identifier: string, password: string) => { success: boolean; message: string; isAdmin?: boolean }
+  setCurrentUserFromSupabase: (player: any) => void
   logout: () => void
   
   // Admin actions
@@ -250,6 +251,46 @@ export const useLeagueStore = create<LeagueStore>()(
       
       logout: () => {
         set({ currentUser: null, isAdminAuthenticated: false })
+      },
+      
+      setCurrentUserFromSupabase: (supabasePlayer) => {
+        // Initialize gymBadges with all league stages
+        const gymBadges: Record<LeagueStage, GymBadge[]> = {
+          pokeball_1: [],
+          pokeball_2: [],
+          pokeball_3: [],
+          greatball_1: [],
+          greatball_2: [],
+          greatball_3: [],
+          ultraball_1: [],
+          ultraball_2: [],
+          ultraball_3: [],
+          masterball: [],
+        }
+        
+        // Convert Supabase player data to local Player format
+        const player: Player = {
+          id: supabasePlayer.id || '',
+          email: supabasePlayer.email || '',
+          firstName: supabasePlayer.full_name?.split(' ')[0] || '',
+          lastName: supabasePlayer.full_name?.split(' ').slice(1).join(' ') || '',
+          trainerName: supabasePlayer.username || '',
+          password: '', // Don't store password
+          role: (supabasePlayer.role || 'user') as UserRole,
+          bp: supabasePlayer.progression?.bp || 0,
+          apexRank: 'Rookie',
+          wins: 0,
+          losses: 0,
+          streak: 0,
+          currentLeague: 'pokeball_1' as LeagueStage,
+          gymBadges,
+          eliteFourBadges: [],
+          championBadge: false,
+          emperorTitle: null,
+          createdAt: supabasePlayer.created_at || new Date().toISOString(),
+        }
+        const isAdmin = ['super_admin', 'admin', 'moderator'].includes(player.role)
+        set({ currentUser: player, isAdminAuthenticated: isAdmin })
       },
       
       adminLogin: (username, password) => {

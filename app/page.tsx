@@ -23,7 +23,10 @@ export default function Home() {
   // Redirect based on login state
   useEffect(() => {
     if (mounted) {
-      if (isAdminAuthenticated) {
+      // Check if user is admin through Supabase auth
+      if (currentUser && ['admin', 'super_admin'].includes(currentUser.role)) {
+        setCurrentView('admin')
+      } else if (isAdminAuthenticated) {
         setCurrentView('admin')
       } else if (currentUser) {
         setCurrentView('dashboard')
