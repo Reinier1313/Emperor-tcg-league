@@ -86,12 +86,29 @@ export async function registerPlayerInSupabase(
 }
 
 /**
- * Login player using email and password via Supabase Auth
+ * Login player using email, trainer name, or trainer ID via Supabase Auth
  */
-export async function loginPlayerInSupabase(email: string, password: string) {
+export async function loginPlayerInSupabase(identifier: string, password: string) {
   try {
     if (!supabase) {
       return { success: false, error: 'Supabase not configured', isAdmin: false, player: null }
+    }
+
+    let email = identifier
+
+    // If identifier is not an email, look up the email from the players table
+    if (!identifier.includes('@')) {
+      const { data: playerLookup, error: lookupError } = await supabase
+        .from('players')
+        .select('email')
+        .or(`username.ilike.${identifier},id.ilike.${identifier}`)
+        .single()
+
+      if (lookupError || !playerLookup?.email) {
+        return { success: false, error: 'Trainer not found. Try logging in with your email.', isAdmin: false, player: null }
+      }
+
+      email = playerLookup.email
     }
 
     // Authenticate with Supabase Auth

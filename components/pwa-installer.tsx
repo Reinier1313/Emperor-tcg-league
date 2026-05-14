@@ -122,7 +122,7 @@ export function PWAInstaller() {
             <div className="flex-1">
               <h3 className="font-semibold mb-2">Install App</h3>
               <p className="text-sm mb-4">
-                Install Tondo Battle League on your device for quick access and offline support.
+                Install Emperor TCG League on your device for quick access and offline support.
               </p>
             </div>
             <button
