@@ -50,16 +50,14 @@ export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPage
       return
     }
     
-    const supabaseResult = await loginPlayerInSupabase(loginIdentifier, loginPassword)
+    // FIX: Automatically remove invisible spaces from autocomplete/mobile keyboards
+    const cleanIdentifier = loginIdentifier.trim()
+    const supabaseResult = await loginPlayerInSupabase(cleanIdentifier, loginPassword)
 
     if (supabaseResult.success && supabaseResult.player) {
-      // Update store with Supabase player data
       setCurrentUserFromSupabase(supabaseResult.player)
-      // Both admin and regular users go to onSuccess
-      // The page routing will check user role and route appropriately
       onSuccess()
     } else {
-      // Supabase throws a specific error if the email isn't confirmed yet
       if (supabaseResult.error?.includes('Email not confirmed')) {
         setLoginError('Please check your email and click the confirmation link before logging in.')
       } else {
@@ -88,16 +86,19 @@ export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPage
       return
     }
     
-    if (registerPassword.length < 4) {
-      setRegisterError('Password must be at least 4 characters')
+    if (registerPassword.length < 6) {
+      setRegisterError('Password must be at least 6 characters')
       setRegisterLoading(false)
       return
     }
     
-    const supabaseResult = await registerPlayerInSupabase(email, registerPassword, {
-      firstName,
-      lastName,
-      trainerName,
+    // FIX: Clean up all inputs to prevent trailing space errors in the database
+    const cleanEmail = email.trim()
+    
+    const supabaseResult = await registerPlayerInSupabase(cleanEmail, registerPassword, {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      trainerName: trainerName.trim(),
     })
     
     const trainerId = supabaseResult.trainerId
