@@ -39,6 +39,8 @@ export function AccountSettingsPage({ onBack }: AccountSettingsPageProps) {
   const [passwordSuccess, setPasswordSuccess] = useState('')
   const [passwordError, setPasswordError] = useState('')
 
+  // test push
+
   if (!currentUser) return null
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
