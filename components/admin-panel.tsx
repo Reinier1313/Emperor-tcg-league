@@ -15,7 +15,8 @@ import {
   updatePlayerProgressionInSupabase, 
   updatePlayerProfileInSupabase, 
   updatePlayerRoleInSupabase, 
-  deletePlayerFromSupabase 
+  deletePlayerFromSupabase,
+  loginPlayerInSupabase
 } from '@/lib/supabaseIntegration'
 import { usePwaInstall } from '@/hooks/use-pwa-install'
 import { PokeballIcon, PokeballSmall } from './pokeball-icon'
@@ -43,30 +44,40 @@ interface AdminPanelProps {
 type DbPlayer = Player & { dbUserId: string }
 
 /**
- * Fallback Login Component for the Admin Panel
+ * Cloud-Connected Login Component for the Admin Panel
  */
 function AdminLogin({ onBack }: { onBack: () => void }) {
-  const { adminLogin } = useLeagueStore()
+  const { setCurrentUserFromSupabase } = useLeagueStore()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
     
-    // Slight delay to simulate verification feel
-    setTimeout(() => {
-      const result = adminLogin(username, password)
-      if (!result.success) {
-        setError(result.message)
+    // Connects directly to Supabase to verify your real credentials!
+    const result = await loginPlayerInSupabase(username, password)
+    
+    if (result.success && result.player) {
+      if (result.isAdmin) {
+        // It's a real admin! Log them into the store
+        setCurrentUserFromSupabase(result.player)
+      } else {
+        // They logged in successfully, but they are just a normal 'user'
+        setError('Access Denied: This account does not have Admin privileges.')
         setPassword('')
       }
-      setIsLoading(false)
-    }, 500)
+    } else {
+      // Wrong password or email
+      setError('Invalid admin credentials.')
+      setPassword('')
+    }
+    
+    setIsLoading(false)
   }
 
   return (
@@ -92,7 +103,7 @@ function AdminLogin({ onBack }: { onBack: () => void }) {
             <Shield className="w-8 h-8 text-primary" />
           </div>
           <CardTitle className="text-2xl font-black tracking-wide">ADMIN ACCESS</CardTitle>
-          <CardDescription>Enter your admin credentials to continue</CardDescription>
+          <CardDescription>Enter credentials to manage the League</CardDescription>
         </CardHeader>
         
         <CardContent>
@@ -100,14 +111,14 @@ function AdminLogin({ onBack }: { onBack: () => void }) {
             <div className="space-y-2">
               <Label htmlFor="admin-username" className="flex items-center gap-2">
                 <User className="w-4 h-4" />
-                Username
+                Email, Trainer Name, or ID
               </Label>
               <Input
                 id="admin-username"
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter admin username"
+                placeholder="Enter admin credentials"
                 autoFocus
               />
             </div>
@@ -123,7 +134,7 @@ function AdminLogin({ onBack }: { onBack: () => void }) {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter admin password"
+                  placeholder="Admin password"
                   className="pr-10"
                 />
                 <button
@@ -137,7 +148,7 @@ function AdminLogin({ onBack }: { onBack: () => void }) {
             </div>
             
             {error && (
-              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm">
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm font-bold">
                 {error}
               </div>
             )}
@@ -146,7 +157,7 @@ function AdminLogin({ onBack }: { onBack: () => void }) {
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Verifying...
+                  Verifying with Cloud...
                 </>
               ) : (
                 <>
