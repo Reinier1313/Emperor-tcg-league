@@ -23,17 +23,14 @@ export async function registerPlayerInSupabase(
       return { success: false, error: 'Supabase not configured' }
     }
 
-    // Step 0: Check if username already exists
+    // Step 0a: Check if username already exists
     const { data: existingPlayer, error: checkError } = await supabase
       .from('players')
       .select('id')
       .ilike('username', playerData.trainerName)
-      .single()
+      .maybeSingle() // Safer than .single() as it doesn't throw on 0 results
 
-    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
-      throw checkError
-    }
-
+    if (checkError) throw checkError
     if (existingPlayer) {
       return { success: false, error: 'Trainer Name already taken' }
     }
@@ -43,12 +40,9 @@ export async function registerPlayerInSupabase(
       .from('players')
       .select('id')
       .ilike('email', email)
-      .single()
+      .maybeSingle()
 
-    if (emailCheckError && emailCheckError.code !== 'PGRST116') { // PGRST116 = no rows found
-      throw emailCheckError
-    }
-
+    if (emailCheckError) throw emailCheckError
     if (existingEmail) {
       return { success: false, error: 'Email already exists' }
     }
@@ -78,7 +72,10 @@ export async function registerPlayerInSupabase(
       .select()
       .single()
 
-    if (playerError) throw playerError
+    if (playerError) {
+      console.error("Player profile creation error:", playerError)
+      throw new Error("Account created, but profile setup failed. Please contact support.")
+    }
 
     // Step 3: Create user role (default to 'user')
     const { error: roleError } = await supabase
@@ -127,11 +124,18 @@ export async function loginPlayerInSupabase(identifier: string, password: string
 
     // If identifier is not an email, look up the email from the players table
     if (!identifier.includes('@')) {
+      // FIX: Check if identifier is a valid UUID format before querying the ID column
+      // Otherwise, Postgres will throw a casting error when searching for 'AshKetchum' in a UUID column.
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+      const lookupQuery = isUUID 
+        ? `username.ilike.${identifier},id.eq.${identifier}`
+        : `username.ilike.${identifier}`;
+
       const { data: playerLookup, error: lookupError } = await supabase
         .from('players')
         .select('email')
-        .or(`username.ilike.${identifier},id.ilike.${identifier}`)
-        .single()
+        .or(lookupQuery)
+        .maybeSingle()
 
       if (lookupError || !playerLookup?.email) {
         return { success: false, error: 'Trainer not found. Try logging in with your email.', isAdmin: false, player: null }
@@ -165,7 +169,7 @@ export async function loginPlayerInSupabase(identifier: string, password: string
       .from('users_roles')
       .select('role')
       .eq('user_id', userId)
-      .single()
+      .maybeSingle()
 
     const userRole = roleData?.role || 'user'
     const isAdmin = ['super_admin', 'admin', 'moderator'].includes(userRole)
@@ -175,7 +179,7 @@ export async function loginPlayerInSupabase(identifier: string, password: string
       .from('player_progression')
       .select('*')
       .eq('user_id', userId)
-      .single()
+      .maybeSingle()
 
     const player = {
       ...playerData,
