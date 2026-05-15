@@ -96,18 +96,21 @@ export async function registerPlayerInSupabase(
 /**
  * Login player using email, trainer name, or trainer ID (ETL-XXXXXX)
  */
+/**
+ * Login player using email, trainer name, or trainer ID (ETL-XXXXXX)
+ */
 export async function loginPlayerInSupabase(identifier: string, password: string) {
   try {
     if (!supabase) {
       return { success: false, error: 'Supabase not configured', isAdmin: false, player: null }
     }
 
-    let targetEmail = identifier
+    let targetEmail = identifier.trim() // Clean whitespace
 
     // If identifier is NOT an email, look up the email from the database
-    if (!identifier.includes('@')) {
-      // Look up by exact Trainer ID OR case-insensitive Trainer Name
-      const lookupQuery = `username.ilike."${identifier}",trainer_id.eq."${identifier.toUpperCase()}"`;
+    if (!targetEmail.includes('@')) {
+      // Look up by exact Trainer ID (case-corrected) OR case-insensitive Trainer Name
+      const lookupQuery = `username.ilike."${targetEmail}",trainer_id.eq."${targetEmail.toUpperCase()}"`;
 
       const { data: playerLookup, error: lookupError } = await supabase
         .from('players')
@@ -116,10 +119,14 @@ export async function loginPlayerInSupabase(identifier: string, password: string
         .maybeSingle()
 
       if (lookupError || !playerLookup?.email) {
-        return { success: false, error: 'Trainer not found. Try logging in with your email or Trainer ID.', isAdmin: false, player: null }
+        return { 
+          success: false, 
+          error: 'Trainer not found. Try logging in with your email or Trainer ID.', 
+          isAdmin: false, 
+          player: null 
+        }
       }
 
-      // We found the email attached to that Trainer ID / Username!
       targetEmail = playerLookup.email
     }
 
@@ -130,6 +137,7 @@ export async function loginPlayerInSupabase(identifier: string, password: string
     })
 
     if (authError) throw authError
+    // ... remainder of existing login logic follows
     if (!authData.user) throw new Error('Authentication failed')
 
     const userId = authData.user.id
@@ -464,12 +472,16 @@ export async function fetchGymBadgesInSupabase(userId: string) {
 /**
  * Request password reset via Supabase Auth
  */
+// In your requestPasswordReset function inside supabaseIntegration.ts
 export async function requestPasswordReset(email: string) {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
     
+    // Use window.location.origin to ensure the redirect matches the current domain
+    const siteUrl = typeof window !== 'undefined' ? window.location.origin : 'https://emperor-tcg-league.vercel.app'
+    
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/reset-password`,
+      redirectTo: `${siteUrl}/reset-password`,
     })
 
     if (error) throw error
