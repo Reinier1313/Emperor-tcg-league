@@ -96,9 +96,6 @@ export async function registerPlayerInSupabase(
 /**
  * Login player using email, trainer name, or trainer ID (ETL-XXXXXX)
  */
-/**
- * Login player using email, trainer name, or trainer ID (ETL-XXXXXX)
- */
 export async function loginPlayerInSupabase(identifier: string, password: string) {
   try {
     if (!supabase) {
@@ -137,28 +134,40 @@ export async function loginPlayerInSupabase(identifier: string, password: string
     })
 
     if (authError) throw authError
-    // ... remainder of existing login logic follows
     if (!authData.user) throw new Error('Authentication failed')
 
     const userId = authData.user.id
 
-    // Fetch the full profile (including the joined role and progression)
+    // ==========================================
+    // DECOUPLED QUERIES (Bypasses 400 Join Error)
+    // ==========================================
+
+    // 1. Fetch core profile
     const { data: p, error: pError } = await supabase
       .from('players')
-      .select(`
-        *,
-        user_role:users_roles(role),
-        progression:player_progression(*)
-      `)
+      .select('*')
       .eq('user_id', userId)
       .single()
 
     if (pError) throw pError
 
+    // 2. Fetch role
+    const { data: roleData } = await supabase
+      .from('users_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    // 3. Fetch progression
+    const { data: progData } = await supabase
+      .from('player_progression')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle()
+
     // Flatten data for the App Store
-    const prog = Array.isArray(p.progression) ? p.progression[0] : (p.progression || {})
-    const roleObj = Array.isArray(p.user_role) ? p.user_role[0] : (p.user_role || {})
-    const userRole = (roleObj.role || 'user') as UserRole
+    const prog = progData || {}
+    const userRole = (roleData?.role || 'user') as UserRole
 
     const player = {
       ...p,
@@ -221,16 +230,25 @@ export async function fetchPlayersFromSupabase() {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured', players: [] }
     
-    const { data, error } = await supabase
-      .from('players')
-      .select(`
-        *,
-        user_role:users_roles(role),
-        progression:player_progression(*)
-      `)
+    // Decoupled query to prevent 400 Bad Request
+    const { data: playersData, error: playersError } = await supabase.from('players').select('*')
+    if (playersError) throw playersError
 
-    if (error) throw error
-    return { success: true, players: data || [] }
+    const { data: rolesData } = await supabase.from('users_roles').select('*')
+    const { data: progData } = await supabase.from('player_progression').select('*')
+
+    const players = (playersData || []).map((p: any) => {
+      const roleMatch = rolesData?.find((r: any) => r.user_id === p.user_id)
+      const progMatch = progData?.find((pr: any) => pr.user_id === p.user_id)
+
+      return {
+        ...p,
+        user_role: roleMatch ? [roleMatch] : [],
+        progression: progMatch ? [progMatch] : []
+      }
+    })
+
+    return { success: true, players }
   } catch (error: any) {
     return { success: false, error: error.message, players: [] }
   }
@@ -243,20 +261,24 @@ export async function fetchPlayerByUserId(userId: string) {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured', player: null }
     
-    const { data, error } = await supabase
-      .from('players')
-      .select(`
-        *,
-        user_role:users_roles(role),
-        progression:player_progression(*),
-        badges:gym_badges(*),
-        battles:battle_history(*)
-      `)
-      .eq('user_id', userId)
-      .single()
+    // Decoupled query to prevent 400 Bad Request
+    const { data: p, error: pError } = await supabase.from('players').select('*').eq('user_id', userId).single()
+    if (pError) throw pError
 
-    if (error) throw error
-    return { success: true, player: data }
+    const { data: roleData } = await supabase.from('users_roles').select('*').eq('user_id', userId).maybeSingle()
+    const { data: progData } = await supabase.from('player_progression').select('*').eq('user_id', userId).maybeSingle()
+    const { data: badgesData } = await supabase.from('gym_badges').select('*').eq('user_id', userId)
+    const { data: battlesData } = await supabase.from('battle_history').select('*').eq('user_id', userId)
+
+    const player = {
+      ...p,
+      user_role: roleData ? [roleData] : [],
+      progression: progData ? [progData] : [],
+      badges: badgesData || [],
+      battles: battlesData || []
+    }
+
+    return { success: true, player }
   } catch (error: any) {
     return { success: false, error: error.message, player: null }
   }
@@ -472,7 +494,6 @@ export async function fetchGymBadgesInSupabase(userId: string) {
 /**
  * Request password reset via Supabase Auth
  */
-// In your requestPasswordReset function inside supabaseIntegration.ts
 export async function requestPasswordReset(email: string) {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
