@@ -1,7 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { useLeagueStore, leagueRegions, rankThresholds, ApexRank, getRoleDisplayName, getRoleColor } from '@/lib/store'
+import { 
+  useLeagueStore, 
+  leagueRegions, 
+  rankThresholds, 
+  rankIcons, // <-- Added import from store
+  ApexRank, 
+  getRoleDisplayName, 
+  getRoleColor 
+} from '@/lib/store'
 import { TrainerCard } from './trainer-card'
 import { PokeballIcon, PokeballSmall } from './pokeball-icon'
 import { Button } from '@/components/ui/button'
@@ -14,20 +22,6 @@ import { AccountSettingsPage } from './account-settings-page'
 interface PlayerDashboardProps {
   onLogout: () => void
   onViewDirectory: () => void
-}
-
-// Get rank icon/pokemon name
-const rankIcons: Record<ApexRank, string> = {
-  Rookie: 'Pikachu',
-  Ace: 'Eevee',
-  Rival: 'Lucario',
-  Elite: 'Gengar',
-  Veteran: 'Garchomp',
-  Dominator: 'Dragonite',
-  Supreme: 'Charizard X',
-  Apex: 'Rayquaza',
-  Ascended: 'Arceus',
-  Invictus: 'Eternatus',
 }
 
 export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardProps) {
@@ -50,8 +44,11 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
   const nextRank = currentRankIndex < ranks.length - 1 ? ranks[currentRankIndex + 1] : null
   const nextRankBP = nextRank ? rankThresholds[nextRank] : null
   const currentRankBP = rankThresholds[currentUser.apexRank]
+  
+  // Safe math: Prevent Division by Zero if thresholds ever get messed up
+  const bpDifference = nextRankBP ? Math.max(1, nextRankBP - currentRankBP) : 1
   const progressToNext = nextRankBP 
-    ? Math.min(100, Math.round(((currentUser.bp - currentRankBP) / (nextRankBP - currentRankBP)) * 100))
+    ? Math.min(100, Math.max(0, Math.round(((currentUser.bp - currentRankBP) / bpDifference) * 100)))
     : 100
   
   const roleStyle = getRoleColor(currentUser.role)
@@ -70,7 +67,8 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
         <div className="container mx-auto px-4 relative">
           <div className="flex flex-col items-center text-center">
             <PokeballIcon size={48} className="mb-4" />
-            <div className="relative w-full max-w-75 md:max-w-100 aspect-4/1">
+            {/* FIXED TAILWIND CLASSES HERE */}
+            <div className="relative w-full max-w-[300px] md:max-w-[400px] aspect-[4/1]">
               <Image
                 src="/emperor-tcg.png"
                 alt="Emperor TCG League"
