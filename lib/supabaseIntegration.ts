@@ -326,6 +326,11 @@ export async function updatePlayerProfileInSupabase(
  * Update player progression data
  * ALIGNED WITH SCHEMA: Uses 'battle_points'. Drops wins/losses/streak to prevent PGRST204 crashes.
  */
+/**
+ * Update player progression data
+ * ALIGNED WITH SCHEMA: Intercepts 'bp' and maps it to 'battle_points'.
+ * Drops 'wins', 'losses', and 'streak' to prevent PGRST204 API crashes.
+ */
 export async function updatePlayerProgressionInSupabase(
   userId: string,
   updates: Partial<any>
@@ -333,10 +338,18 @@ export async function updatePlayerProgressionInSupabase(
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
     
-    // Map the frontend 'bp' to your schema's 'battle_points' column
+    // 1. Create a CLEAN object that only contains valid schema columns
     const dbUpdates: any = {}
-    if (updates.bp !== undefined) dbUpdates.battle_points = updates.bp
-    if (updates.battle_points !== undefined) dbUpdates.battle_points = updates.battle_points
+    
+    // 2. Safely map the frontend's 'bp' to the database's 'battle_points'
+    if (updates.bp !== undefined) {
+      dbUpdates.battle_points = updates.bp
+    } else if (updates.battle_points !== undefined) {
+      dbUpdates.battle_points = updates.battle_points
+    }
+
+    // Notice we DO NOT add wins, losses, or streak to dbUpdates. 
+    // If we send those to your current database schema, it will throw a 400 Bad Request.
 
     const { data: existing } = await supabase
       .from('player_progression')
@@ -349,13 +362,13 @@ export async function updatePlayerProgressionInSupabase(
     if (existing && existing.length > 0) {
       result = await supabase
         .from('player_progression')
-        .update(dbUpdates)
+        .update(dbUpdates) // We send the clean object here!
         .eq('user_id', userId)
         .select()
     } else {
       result = await supabase
         .from('player_progression')
-        .insert([{ user_id: userId, ...dbUpdates }])
+        .insert([{ user_id: userId, ...dbUpdates }]) // And here!
         .select()
     }
 
