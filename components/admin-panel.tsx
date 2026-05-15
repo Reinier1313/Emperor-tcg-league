@@ -194,9 +194,14 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
   const [editedFirstName, setEditedFirstName] = useState('')
   const [editedLastName, setEditedLastName] = useState('')
   const [editedTrainerName, setEditedTrainerName] = useState('')
-  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
   // Fetch live players from Supabase on component mount
   // Fetch live players from Supabase on component mount
@@ -274,7 +279,7 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
     setEditedFirstName(player.firstName)
     setEditedLastName(player.lastName)
     setEditedTrainerName(player.trainerName)
-    setSaveSuccess(false)
+    setToast(null)
     setDeleteConfirm(false)
   }
   
@@ -299,8 +304,7 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
       ))
       
       setSelectedPlayer({ ...selectedPlayer, wins, losses, streak, bp, apexRank: newRank })
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 2000)
+      showToast('⚡ Stats updated successfully!')
     }
     setIsSaving(false)
   }
@@ -320,8 +324,7 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
         p.id === selectedPlayer.id ? { ...p, firstName: editedFirstName, lastName: editedLastName, trainerName: editedTrainerName } : p
       ))
       setSelectedPlayer({ ...selectedPlayer, firstName: editedFirstName, lastName: editedLastName, trainerName: editedTrainerName })
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 2000)
+      showToast('✏️ Profile updated successfully!')
     }
     setIsSaving(false)
   }
@@ -337,8 +340,7 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
         p.id === selectedPlayer.id ? { ...p, role: editedRole } : p
       ))
       setSelectedPlayer({ ...selectedPlayer, role: editedRole })
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 2000)
+      showToast(`🛡️ Role changed to ${getRoleDisplayName(editedRole)}!`)
     }
     setIsSaving(false)
   }
@@ -353,6 +355,7 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
       setDbPlayers(prev => prev.filter(p => p.id !== selectedPlayer.id))
       setSelectedPlayer(null)
       setDeleteConfirm(false)
+      showToast('🗑️ Player deleted from database.')
     }
     setIsSaving(false)
   }
@@ -412,6 +415,23 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
   
   return (
     <div className="min-h-screen bg-background">
+      {/* Toast Notification */}
+      <div
+        className={cn(
+          'fixed top-5 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ease-out pointer-events-none',
+          toast ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-3'
+        )}
+      >
+        <div className={cn(
+          'flex items-center gap-3 px-5 py-3 rounded-full shadow-lg text-sm font-semibold border backdrop-blur-sm',
+          toast?.type === 'success'
+            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+            : 'bg-destructive/10 border-destructive/30 text-destructive'
+        )}>
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          {toast?.message}
+        </div>
+      </div>
       {/* Header Section */}
       <header className="bg-accent text-accent-foreground py-6 relative overflow-hidden">
         <div className="absolute inset-0 opacity-5">
@@ -570,7 +590,6 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
                               <span>{selectedPlayer.apexRank}</span>
                             </div>
                           </div>
-                          {saveSuccess && <span className="flex items-center gap-1 text-sm text-emerald-600"><CheckCircle2 className="w-4 h-4" />Live DB Saved!</span>}
                         </div>
                       </CardContent>
                     </Card>
