@@ -291,30 +291,40 @@ export async function fetchPlayerByUserId(userId: string) {
 /**
  * Update player profile information
  */
+/**
+ * Update player profile information
+ * ALIGNED WITH SCHEMA: Uses strictly 'full_name' and 'username'
+ */
 export async function updatePlayerProfileInSupabase(
   userId: string,
-  updates: { full_name?: string; username?: string }
+  updates: any
 ) {
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
     
+    // Map strictly to the columns that exist in the players table
+    const dbUpdates: any = {}
+    if (updates.full_name) dbUpdates.full_name = updates.full_name
+    if (updates.username) dbUpdates.username = updates.username
+
     const { data, error } = await supabase
       .from('players')
-      .update(updates)
+      .update(dbUpdates)
       .eq('user_id', userId)
       .select()
 
     if (error) throw error
-    // Safely extract without .single()
     const updatedPlayer = Array.isArray(data) ? data[0] : data
     return { success: true, player: updatedPlayer }
   } catch (error: any) {
+    console.error("Profile Update Error:", error)
     return { success: false, error: error.message }
   }
 }
 
 /**
- * Update player progression data (Wins, BP, etc.)
+ * Update player progression data
+ * ALIGNED WITH SCHEMA: Uses 'battle_points'. Drops wins/losses/streak to prevent PGRST204 crashes.
  */
 export async function updatePlayerProgressionInSupabase(
   userId: string,
@@ -323,7 +333,11 @@ export async function updatePlayerProgressionInSupabase(
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
     
-    // Safely check using limit(1) instead of maybeSingle()
+    // Map the frontend 'bp' to your schema's 'battle_points' column
+    const dbUpdates: any = {}
+    if (updates.bp !== undefined) dbUpdates.battle_points = updates.bp
+    if (updates.battle_points !== undefined) dbUpdates.battle_points = updates.battle_points
+
     const { data: existing } = await supabase
       .from('player_progression')
       .select('id')
@@ -335,13 +349,13 @@ export async function updatePlayerProgressionInSupabase(
     if (existing && existing.length > 0) {
       result = await supabase
         .from('player_progression')
-        .update(updates)
+        .update(dbUpdates)
         .eq('user_id', userId)
         .select()
     } else {
       result = await supabase
         .from('player_progression')
-        .insert([{ user_id: userId, ...updates }])
+        .insert([{ user_id: userId, ...dbUpdates }])
         .select()
     }
 

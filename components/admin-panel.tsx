@@ -219,7 +219,7 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
           const roleObj = Array.isArray(p.user_role) ? p.user_role[0] : (p.user_role || {})
           
           // USE OPTIONAL CHAINING (?.) TO PREVENT CRASHES IF DATA IS MISSING
-          const bp = prog?.bp || 0
+          const bp = prog?.battle_points || prog?.bp || 0
 
           return {
             id: p.trainer_id || p.user_id, // Display the custom ETL ID if it exists
