@@ -7,8 +7,6 @@ import {
   UserRole, 
   getRoleDisplayName, 
   getRoleColor, 
-  canCRUDPlayers, 
-  canEditStats 
 } from '@/lib/store'
 import { 
   fetchPlayersFromSupabase, 
@@ -251,16 +249,13 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
     return () => { isMounted = false }
   }, [calculateRank])
 
-  // Authentication Check: Panel is only for Admins or Super Admins
-  const hasAdminAccess = currentUser && ['admin', 'super_admin'].includes(currentUser.role)
+  // Authentication Check: Panel is accessible by Super Admins, Admins, and Moderators
+  const hasAdminAccess = currentUser && ['admin', 'super_admin', 'moderator'].includes(currentUser.role)
 
   if (!hasAdminAccess) {
     return <AdminLogin onBack={onBack} />
   }
 
-  const canCRUD = canCRUDPlayers(currentUser.role)
-  const canEdit = canEditStats(currentUser.role)
-  
   // Filter the player list based on the search input
   const filteredPlayers = dbPlayers.filter(player => 
     player.trainerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -369,11 +364,50 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
   }
   
   const canModifyPlayer = (player: DbPlayer): boolean => {
+    // Super Admin can modify anyone except other Super Admins (self-protection handled separately)
     if (currentUser.role === 'super_admin') return true
+    // Nobody can touch a Super Admin
     if (player.role === 'super_admin') return false
-    if (currentUser.role === 'admin' && player.role !== 'admin') return true
+    // Admins can only modify Moderators and Users — NOT other Admins
+    if (currentUser.role === 'admin' && (player.role === 'moderator' || player.role === 'user')) return true
+    // Moderators can only touch standard Users
     if (currentUser.role === 'moderator' && player.role === 'user') return true
     return false
+  }
+
+  // Whether the current user can edit stats/BP for the selected player
+  const canEditStatsForPlayer = (player: DbPlayer): boolean => {
+    if (!canModifyPlayer(player)) return false
+    // All three roles can edit stats, but Moderators only on Users (already enforced by canModifyPlayer)
+    return currentUser.role === 'super_admin' || currentUser.role === 'admin' || currentUser.role === 'moderator'
+  }
+
+  // Whether the current user can edit the profile of the selected player
+  const canEditProfileForPlayer = (player: DbPlayer): boolean => {
+    if (!canModifyPlayer(player)) return false
+    // Moderators CANNOT edit profiles — only Super Admin and Admin
+    return currentUser.role === 'super_admin' || currentUser.role === 'admin'
+  }
+
+  // Whether the current user can manage the role of the selected player
+  const canManageRoleForPlayer = (player: DbPlayer): boolean => {
+    if (!canModifyPlayer(player)) return false
+    // Moderators cannot manage roles at all
+    if (currentUser.role === 'moderator') return false
+    // Super Admins can assign any role (target can't be super_admin — already blocked by canModifyPlayer)
+    if (currentUser.role === 'super_admin') return true
+    // Admins can only assign up to Moderator — target must not be an Admin
+    if (currentUser.role === 'admin' && (player.role === 'user' || player.role === 'moderator')) return true
+    return false
+  }
+
+  // Whether the current user can delete the selected player
+  const canDeletePlayer = (player: DbPlayer): boolean => {
+    if (!canModifyPlayer(player)) return false
+    // Moderators cannot delete
+    if (currentUser.role === 'moderator') return false
+    // Cannot delete yourself
+    return player.id !== currentUser.id
   }
   
   return (
@@ -543,8 +577,8 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
                     
                     {canModifyPlayer(selectedPlayer) ? (
                       <div className="grid md:grid-cols-2 gap-6">
-                        {/* Stats Panel */}
-                        {canEdit && (
+                        {/* Stats Panel — visible to Super Admin, Admin, and Moderator (for Users only) */}
+                        {canEditStatsForPlayer(selectedPlayer) && (
                           <Card>
                             <CardHeader className="pb-3">
                               <CardTitle className="text-base flex items-center gap-2"><Award className="w-4 h-4" />Edit Live Stats</CardTitle>
@@ -566,8 +600,8 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
                           </Card>
                         )}
                         
-                        {/* Profile Panel */}
-                        {canCRUD && (
+                        {/* Profile Panel — hidden from Moderators */}
+                        {canEditProfileForPlayer(selectedPlayer) && (
                           <Card>
                             <CardHeader className="pb-3">
                               <CardTitle className="text-base flex items-center gap-2"><User className="w-4 h-4" />Edit Live Profile</CardTitle>
@@ -584,8 +618,8 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
                           </Card>
                         )}
                         
-                        {/* Role Management */}
-                        {canCRUD && selectedPlayer.role !== 'super_admin' && (
+                        {/* Role Management — hidden from Moderators; Admins cannot promote to Admin */}
+                        {canManageRoleForPlayer(selectedPlayer) && (
                           <Card>
                             <CardHeader className="pb-3">
                               <CardTitle className="text-base flex items-center gap-2"><Shield className="w-4 h-4" />Manage Role</CardTitle>
@@ -608,8 +642,8 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
                           </Card>
                         )}
                         
-                        {/* Delete User Section */}
-                        {canCRUD && selectedPlayer.role !== 'super_admin' && selectedPlayer.id !== currentUser.id && (
+                        {/* Delete User Section — Super Admin only */}
+                        {canDeletePlayer(selectedPlayer) && (
                           <Card className="border-destructive/30">
                             <CardHeader className="pb-3">
                               <CardTitle className="text-base flex items-center gap-2 text-destructive"><AlertTriangle className="w-4 h-4" />Danger Zone</CardTitle>
