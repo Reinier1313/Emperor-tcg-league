@@ -284,6 +284,10 @@ export async function fetchPlayerByUserId(userId: string) {
   }
 }
 
+// ============================================
+// CRASH-PROOF UPDATES (406 FIX)
+// ============================================
+
 /**
  * Update player profile information
  */
@@ -299,10 +303,11 @@ export async function updatePlayerProfileInSupabase(
       .update(updates)
       .eq('user_id', userId)
       .select()
-      .single()
 
     if (error) throw error
-    return { success: true, player: data }
+    // Safely extract without .single()
+    const updatedPlayer = Array.isArray(data) ? data[0] : data
+    return { success: true, player: updatedPlayer }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -318,16 +323,34 @@ export async function updatePlayerProgressionInSupabase(
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
     
-    const { data, error } = await supabase
+    // Safely check using limit(1) instead of maybeSingle()
+    const { data: existing } = await supabase
       .from('player_progression')
-      .update(updates)
+      .select('id')
       .eq('user_id', userId)
-      .select()
-      .single()
+      .limit(1)
 
-    if (error) throw error
-    return { success: true, progression: data }
+    let result;
+    
+    if (existing && existing.length > 0) {
+      result = await supabase
+        .from('player_progression')
+        .update(updates)
+        .eq('user_id', userId)
+        .select()
+    } else {
+      result = await supabase
+        .from('player_progression')
+        .insert([{ user_id: userId, ...updates }])
+        .select()
+    }
+
+    if (result.error) throw result.error
+    
+    const updatedProgression = Array.isArray(result.data) ? result.data[0] : result.data
+    return { success: true, progression: updatedProgression }
   } catch (error: any) {
+    console.error("Progression Update Error:", error)
     return { success: false, error: error.message }
   }
 }
@@ -343,16 +366,33 @@ export async function updatePlayerRoleInSupabase(userId: string, role: UserRole)
   try {
     if (!supabase) return { success: false, error: 'Supabase not configured' }
     
-    const { data, error } = await supabase
+    const { data: existing } = await supabase
       .from('users_roles')
-      .update({ role })
+      .select('id')
       .eq('user_id', userId)
-      .select()
-      .single()
+      .limit(1)
 
-    if (error) throw error
-    return { success: true, role: data }
+    let result;
+    
+    if (existing && existing.length > 0) {
+      result = await supabase
+        .from('users_roles')
+        .update({ role })
+        .eq('user_id', userId)
+        .select()
+    } else {
+      result = await supabase
+        .from('users_roles')
+        .insert([{ user_id: userId, role }])
+        .select()
+    }
+
+    if (result.error) throw result.error
+    
+    const updatedRole = Array.isArray(result.data) ? result.data[0] : result.data
+    return { success: true, role: updatedRole }
   } catch (error: any) {
+    console.error("Role Update Error:", error)
     return { success: false, error: error.message }
   }
 }
@@ -403,10 +443,10 @@ export async function recordGymBadgeInSupabase(
         },
       ])
       .select()
-      .single()
 
     if (error) throw error
-    return { success: true, badge: data }
+    const newBadge = Array.isArray(data) ? data[0] : data
+    return { success: true, badge: newBadge }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -439,10 +479,10 @@ export async function recordBattleInSupabase(
         },
       ])
       .select()
-      .single()
 
     if (error) throw error
-    return { success: true, battle: data }
+    const newBattle = Array.isArray(data) ? data[0] : data
+    return { success: true, battle: newBattle }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
