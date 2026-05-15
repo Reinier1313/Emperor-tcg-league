@@ -254,41 +254,40 @@ export const useLeagueStore = create<LeagueStore>()(
       },
       
       setCurrentUserFromSupabase: (supabasePlayer) => {
-        // Initialize gymBadges with all league stages
-        const gymBadges: Record<LeagueStage, GymBadge[]> = {
-          pokeball_1: [],
-          pokeball_2: [],
-          pokeball_3: [],
-          greatball_1: [],
-          greatball_2: [],
-          greatball_3: [],
-          ultraball_1: [],
-          ultraball_2: [],
-          ultraball_3: [],
-          masterball: [],
-        }
+        // Fallbacks in case progression data is missing
+        const defaultBadges = createInitialGymBadges();
+        const defaultEliteFour = createInitialEliteFourBadges();
+        
+        const bp = supabasePlayer.progression?.bp || 0;
         
         // Convert Supabase player data to local Player format
         const player: Player = {
-          id: supabasePlayer.id || '',
+          id: supabasePlayer.user_id || supabasePlayer.id || '',
           email: supabasePlayer.email || '',
           firstName: supabasePlayer.full_name?.split(' ')[0] || '',
           lastName: supabasePlayer.full_name?.split(' ').slice(1).join(' ') || '',
           trainerName: supabasePlayer.username || '',
-          password: '', // Don't store password
+          password: '', // Don't store password locally
           role: (supabasePlayer.role || 'user') as UserRole,
-          bp: supabasePlayer.progression?.bp || 0,
-          apexRank: 'Rookie',
-          wins: 0,
-          losses: 0,
-          streak: 0,
-          currentLeague: 'pokeball_1' as LeagueStage,
-          gymBadges,
-          eliteFourBadges: [],
-          championBadge: false,
-          emperorTitle: null,
+          
+          // Fetched live data from Supabase
+          bp: bp,
+          apexRank: calculateRankFromBP(bp),
+          wins: supabasePlayer.progression?.wins || 0,
+          losses: supabasePlayer.progression?.losses || 0,
+          streak: supabasePlayer.progression?.streak || 0,
+          
+          currentLeague: supabasePlayer.progression?.current_league || 'pokeball_1',
+          
+          // Use saved badges if they exist, otherwise fallback
+          gymBadges: supabasePlayer.progression?.gym_badges || defaultBadges,
+          eliteFourBadges: supabasePlayer.progression?.elite_four_badges || defaultEliteFour,
+          championBadge: supabasePlayer.progression?.champion_badge || false,
+          emperorTitle: supabasePlayer.progression?.emperor_title || null,
+          
           createdAt: supabasePlayer.created_at || new Date().toISOString(),
         }
+        
         const isAdmin = ['super_admin', 'admin', 'moderator'].includes(player.role)
         set({ currentUser: player, isAdminAuthenticated: isAdmin })
       },
