@@ -201,6 +201,7 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
   const [isSaving, setIsSaving] = useState(false)
 
   // Fetch live players from Supabase on component mount
+  // Fetch live players from Supabase on component mount
   useEffect(() => {
     let isMounted = true
     const loadPlayers = async () => {
@@ -213,7 +214,9 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
           // Supabase joins often return arrays; we safely extract the first object
           const prog = Array.isArray(p.progression) ? p.progression[0] : (p.progression || {})
           const roleObj = Array.isArray(p.user_role) ? p.user_role[0] : (p.user_role || {})
-          const bp = prog.bp || 0
+          
+          // USE OPTIONAL CHAINING (?.) TO PREVENT CRASHES IF DATA IS MISSING
+          const bp = prog?.bp || 0
 
           return {
             id: p.trainer_id || p.user_id, // Display the custom ETL ID if it exists
@@ -223,17 +226,19 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
             lastName: p.full_name?.split(' ').slice(1).join(' ') || '',
             trainerName: p.username || 'Unknown',
             password: '',
-            role: (roleObj.role || p.role || 'user') as UserRole,
+            // SAFE READ: If roleObj is undefined, it skips .role and defaults to 'user'
+            role: (roleObj?.role || p.role || 'user') as UserRole, 
             bp: bp,
             apexRank: calculateRank(bp),
-            wins: prog.wins || 0,
-            losses: prog.losses || 0,
-            streak: prog.streak || 0,
-            currentLeague: prog.current_league || 'pokeball_1',
-            gymBadges: prog.gym_badges || {},
-            eliteFourBadges: prog.elite_four_badges || [],
-            championBadge: prog.champion_badge || false,
-            emperorTitle: prog.emperor_title || null,
+            // SAFE READS: Use ?. to prevent crashes if prog is undefined
+            wins: prog?.wins || 0,
+            losses: prog?.losses || 0,
+            streak: prog?.streak || 0,
+            currentLeague: prog?.current_league || 'pokeball_1',
+            gymBadges: prog?.gym_badges || {},
+            eliteFourBadges: prog?.elite_four_badges || [],
+            championBadge: prog?.champion_badge || false,
+            emperorTitle: prog?.emperor_title || null,
             createdAt: p.created_at || new Date().toISOString()
           }
         })
