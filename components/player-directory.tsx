@@ -1,14 +1,15 @@
 'use client'
 
-import { useState } from 'react'
-import { useLeagueStore, Player, ApexRank, getRoleDisplayName, getRoleColor } from '@/lib/store'
+import { useState, useEffect } from 'react'
+import { useLeagueStore, Player, ApexRank, getRoleDisplayName, getRoleColor, UserRole, LeagueStage } from '@/lib/store'
+import { fetchPlayersFromSupabase } from '@/lib/supabaseIntegration'
 import { PokeballIcon, PokeballSmall } from './pokeball-icon'
 import { TrainerCard } from './trainer-card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ArrowLeft, Search, User, Trophy, Zap, Shield, Crown, UserCog } from 'lucide-react'
+import { ArrowLeft, Search, User, Trophy, Zap, Shield, Crown, UserCog, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
@@ -31,11 +32,65 @@ const apexRankColors: Record<ApexRank, { bg: string; text: string; border: strin
 }
 
 export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
-  const { players } = useLeagueStore()
+  const { calculateRank } = useLeagueStore()
+  
+  // State for live database players
+  const [dbPlayers, setDbPlayers] = useState<Player[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
   
-  const filteredPlayers = players.filter(player => 
+  // Fetch live players from Supabase on mount
+  useEffect(() => {
+    let isMounted = true
+    const loadPlayers = async () => {
+      setIsLoading(true)
+      try {
+        const res = await fetchPlayersFromSupabase()
+        
+        if (res.success && res.players && isMounted) {
+          const mapped = res.players.map((p: any) => {
+            const prog = Array.isArray(p.progression) ? p.progression[0] : (p.progression || {})
+            const roleObj = Array.isArray(p.user_role) ? p.user_role[0] : (p.user_role || {})
+            const bp = prog.bp || 0
+
+            return {
+              id: p.trainer_id || 'ID PENDING',
+              dbUserId: p.user_id || p.id || '',
+              email: p.email || '',
+              firstName: p.full_name?.split(' ')[0] || '',
+              lastName: p.full_name?.split(' ').slice(1).join(' ') || '',
+              trainerName: p.username || 'Unknown Trainer',
+              password: '', 
+              role: (roleObj.role || p.role || 'user') as UserRole,
+              bp: bp,
+              apexRank: calculateRank(bp),
+              wins: prog.wins || 0,
+              losses: prog.losses || 0,
+              streak: prog.streak || 0,
+              currentLeague: (prog.current_league || 'pokeball_1') as LeagueStage,
+              gymBadges: prog.gym_badges || {},
+              eliteFourBadges: prog.elite_four_badges || [],
+              championBadge: prog.champion_badge || false,
+              emperorTitle: prog.emperor_title || null,
+              createdAt: p.created_at || new Date().toISOString()
+            }
+          })
+          setDbPlayers(mapped)
+        }
+      } catch (error) {
+        console.error("Error fetching live players:", error)
+      } finally {
+        if (isMounted) setIsLoading(false)
+      }
+    }
+    
+    loadPlayers()
+    return () => { isMounted = false }
+  }, [calculateRank])
+
+  const filteredPlayers = dbPlayers.filter(player => 
     player.trainerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     player.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
     `${player.firstName} ${player.lastName}`.toLowerCase().includes(searchQuery.toLowerCase())
@@ -99,8 +154,6 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
             />
           </div>
         </div>
-
-        
       </div>
       
       {/* Main Content */}
@@ -110,13 +163,19 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
           <div className="flex items-center gap-2">
             <User className="w-5 h-5 text-muted-foreground" />
             <span className="text-muted-foreground">
-              {sortedPlayers.length} {sortedPlayers.length === 1 ? 'Trainer' : 'Trainers'} registered
+              {isLoading ? 'Loading Trainers...' : `${sortedPlayers.length} ${sortedPlayers.length === 1 ? 'Trainer' : 'Trainers'} registered`}
             </span>
           </div>
         </div>
         
-        {/* Player Grid */}
-        {sortedPlayers.length === 0 ? (
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="text-center py-20 flex flex-col items-center justify-center">
+            <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-card-foreground">Connecting to Supabase...</h3>
+            <p className="text-muted-foreground">Downloading live player data</p>
+          </div>
+        ) : sortedPlayers.length === 0 ? (
           <div className="text-center py-12">
             <PokeballIcon size={64} className="mx-auto mb-4 opacity-20" />
             <h3 className="text-lg font-semibold text-card-foreground mb-2">No trainers found</h3>
@@ -137,11 +196,11 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
                   className="cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1"
                   onClick={() => setSelectedPlayer(player)}
                 >
-                  <CardContent className="p-4">
+                  <CardContent className="p-4 relative">
                     {/* Leaderboard position for top 3 */}
                     {index < 3 && (
                       <div className={cn(
-                        'absolute -top-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold',
+                        'absolute -top-2 -right-2 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm',
                         index === 0 && 'bg-amber-400 text-amber-900',
                         index === 1 && 'bg-zinc-300 text-zinc-800',
                         index === 2 && 'bg-amber-600 text-amber-100'
@@ -171,7 +230,7 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
                           <h3 className="font-bold text-card-foreground truncate">{player.trainerName}</h3>
                           {isStaff && (
                             <span className={cn(
-                              'px-1 py-0.5 rounded text-[8px] font-semibold',
+                              'px-1 py-0.5 rounded text-[8px] font-semibold shrink-0',
                               roleStyle.bg, roleStyle.text
                             )}>
                               {getRoleDisplayName(player.role)}
@@ -229,7 +288,7 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
       </main>
       
       {/* Player Profile Modal */}
-      <Dialog open={!!selectedPlayer} onOpenChange={() => setSelectedPlayer(null)}>
+      <Dialog open={!!selectedPlayer} onOpenChange={(open) => !open && setSelectedPlayer(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
