@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useLeagueStore } from '@/lib/store'
+import { getCurrentSession } from '@/lib/supabaseIntegration'
 import { AuthPage } from '@/components/auth-page'
 import { ForgotPasswordPage } from '@/components/forgot-password-page'
 import { PlayerDashboard } from '@/components/player-dashboard'
@@ -11,13 +12,27 @@ import { AdminPanel } from '@/components/admin-panel'
 type View = 'auth' | 'forgot-password' | 'dashboard' | 'directory' | 'admin'
 
 export default function Home() {
-  const { currentUser, isAdminAuthenticated, adminLogout } = useLeagueStore()
+  // Destructure logout to clear stale state if needed
+  const { currentUser, isAdminAuthenticated, adminLogout, logout } = useLeagueStore()
   const [currentView, setCurrentView] = useState<View>('auth')
   const [mounted, setMounted] = useState(false)
   
-  // Handle hydration
+  // Handle hydration and validate Supabase session
   useEffect(() => {
-    setMounted(true)
+    const validateSession = async () => {
+      // Check if Supabase still thinks we have a valid auth token
+      const { session } = await getCurrentSession()
+      
+      // If Zustand thinks we are logged in, but Supabase has no session,
+      // force clear the local store to prevent "ghost" logins.
+      if (!session && useLeagueStore.getState().currentUser) {
+        useLeagueStore.getState().logout()
+      }
+      
+      setMounted(true)
+    }
+    
+    validateSession()
   }, [])
   
   // Redirect based on login state
@@ -36,7 +51,7 @@ export default function Home() {
     }
   }, [currentUser, isAdminAuthenticated, mounted])
   
-  // Show loading state during hydration
+  // Show loading state during hydration and session validation
   if (!mounted) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
