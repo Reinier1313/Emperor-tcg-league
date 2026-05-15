@@ -9,6 +9,13 @@ import { Player, UserRole } from './store'
  * Register a new player using Supabase Auth
  * Creates auth user, player profile, user role, and progression data
  */
+// ============================================
+// REGISTRATION & AUTHENTICATION
+// ============================================
+
+/**
+ * Register a new player using Supabase Auth
+ */
 export async function registerPlayerInSupabase(
   email: string,
   password: string,
@@ -23,7 +30,7 @@ export async function registerPlayerInSupabase(
       return { success: false, error: 'Supabase not configured' }
     }
 
-    // Step 0a: Check if username already exists
+    // Check if username already exists
     const { data: existingPlayer, error: checkError } = await supabase
       .from('players')
       .select('id')
@@ -35,7 +42,7 @@ export async function registerPlayerInSupabase(
       return { success: false, error: 'Trainer Name already taken' }
     }
 
-    // Step 0b: Check if email already exists
+    // Check if email already exists
     const { data: existingEmail, error: emailCheckError } = await supabase
       .from('players')
       .select('id')
@@ -47,7 +54,24 @@ export async function registerPlayerInSupabase(
       return { success: false, error: 'Email already exists' }
     }
 
-    // Step 1: Create auth user AND pass metadata for the SQL Trigger
+    // GENERATE UNIQUE TRAINER ID (ETL-XXXXXX)
+    let uniqueTrainerId = '';
+    let isUnique = false;
+    
+    // Loop ensures we never assign an ID that someone else already has
+    while (!isUnique) {
+      // Generates ETL- followed by 6 random numbers
+      uniqueTrainerId = `ETL-${Math.floor(100000 + Math.random() * 900000)}`;
+      const { data } = await supabase
+        .from('players')
+        .select('trainer_id')
+        .eq('trainer_id', uniqueTrainerId)
+        .maybeSingle();
+
+      if (!data) isUnique = true; 
+    }
+
+    // Create auth user & pass metadata for the SQL Trigger to catch
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -56,6 +80,7 @@ export async function registerPlayerInSupabase(
           first_name: playerData.firstName,
           last_name: playerData.lastName,
           trainer_name: playerData.trainerName,
+          trainer_id: uniqueTrainerId // Passing our unique ID!
         }
       }
     })
@@ -63,12 +88,10 @@ export async function registerPlayerInSupabase(
     if (authError) throw authError
     if (!authData.user) throw new Error('Failed to create user')
 
-    // Steps 2, 3, and 4 are now automatically handled by the Supabase SQL Trigger!
-
     return { 
       success: true, 
       userId: authData.user.id,
-      trainerId: playerData.trainerName 
+      trainerId: uniqueTrainerId // Frontend uses this to show the success message
     }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -76,7 +99,7 @@ export async function registerPlayerInSupabase(
 }
 
 /**
- * Login player using email, trainer name, or trainer ID via Supabase Auth
+ * Login player using email, trainer name, or trainer ID (ETL-XXXXXX)
  */
 export async function loginPlayerInSupabase(identifier: string, password: string) {
   try {
@@ -86,14 +109,11 @@ export async function loginPlayerInSupabase(identifier: string, password: string
 
     let email = identifier
 
-    // If identifier is not an email, look up the email from the players table
+    // If identifier is NOT an email, look up the email from the database
     if (!identifier.includes('@')) {
-      // FIX: Check if identifier is a valid UUID format before querying the ID column
-      // Otherwise, Postgres will throw a casting error when searching for 'AshKetchum' in a UUID column.
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
-      const lookupQuery = isUUID 
-        ? `username.ilike.${identifier},id.eq.${identifier}`
-        : `username.ilike.${identifier}`;
+      
+      // Look up by exact Trainer ID OR case-insensitive Trainer Name
+      const lookupQuery = `username.ilike.${identifier},trainer_id.eq.${identifier.toUpperCase()}`;
 
       const { data: playerLookup, error: lookupError } = await supabase
         .from('players')
@@ -105,6 +125,7 @@ export async function loginPlayerInSupabase(identifier: string, password: string
         return { success: false, error: 'Trainer not found. Try logging in with your email.', isAdmin: false, player: null }
       }
 
+      // We found the email attached to that Trainer ID / Username!
       email = playerLookup.email
     }
 
@@ -129,7 +150,7 @@ export async function loginPlayerInSupabase(identifier: string, password: string
     if (playerError) throw playerError
 
     // Get user role
-    const { data: roleData, error: roleError } = await supabase
+    const { data: roleData } = await supabase
       .from('users_roles')
       .select('role')
       .eq('user_id', userId)
