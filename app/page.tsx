@@ -12,19 +12,16 @@ import { AdminPanel } from '@/components/admin-panel'
 type View = 'auth' | 'forgot-password' | 'dashboard' | 'directory' | 'admin'
 
 export default function Home() {
-  // Destructure logout to clear stale state if needed
-  const { currentUser, isAdminAuthenticated, adminLogout, logout } = useLeagueStore()
+  // CLEANED: Removed unused 'isAdminAuthenticated' and 'logout' to fix TypeScript errors
+  const { currentUser, adminLogout } = useLeagueStore()
   const [currentView, setCurrentView] = useState<View>('auth')
   const [mounted, setMounted] = useState(false)
   
-  // Handle hydration and validate Supabase session
   useEffect(() => {
     const validateSession = async () => {
-      // Check if Supabase still thinks we have a valid auth token
       const { session } = await getCurrentSession()
       
-      // If Zustand thinks we are logged in, but Supabase has no session,
-      // force clear the local store to prevent "ghost" logins.
+      // We call logout directly from the store state to avoid dependency warnings
       if (!session && useLeagueStore.getState().currentUser) {
         useLeagueStore.getState().logout()
       }
@@ -35,23 +32,24 @@ export default function Home() {
     validateSession()
   }, [])
   
-  // Redirect based on login state
+  // Unlocked Routing Logic
   useEffect(() => {
     if (mounted) {
-      // Check if user is admin through Supabase auth
-      if (currentUser && ['admin', 'super_admin'].includes(currentUser.role)) {
-        setCurrentView('admin')
-      } else if (isAdminAuthenticated) {
-        setCurrentView('admin')
-      } else if (currentUser) {
-        setCurrentView('dashboard')
-      } else {
+      // If user logs out, kick them to auth
+      if (!currentUser && currentView !== 'forgot-password') {
         setCurrentView('auth')
+      } 
+      // If user just logged in (is on auth page), decide where to send them initially
+      else if (currentUser && currentView === 'auth') {
+        if (['admin', 'super_admin', 'moderator'].includes(currentUser.role)) {
+          setCurrentView('admin')
+        } else {
+          setCurrentView('dashboard')
+        }
       }
     }
-  }, [currentUser, isAdminAuthenticated, mounted])
+  }, [currentUser, mounted, currentView])
   
-  // Show loading state during hydration and session validation
   if (!mounted) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -63,7 +61,6 @@ export default function Home() {
     )
   }
   
-  // Auth view
   if (currentView === 'auth') {
     return (
       <AuthPage 
@@ -74,37 +71,31 @@ export default function Home() {
     )
   }
 
-  // Forgot Password view
   if (currentView === 'forgot-password') {
-    return (
-      <ForgotPasswordPage 
-        onBack={() => setCurrentView('auth')}
-      />
-    )
+    return <ForgotPasswordPage onBack={() => setCurrentView('auth')} />
   }
   
-  // Player Directory view
   if (currentView === 'directory') {
     return <PlayerDirectory onBack={() => setCurrentView('dashboard')} />
   }
   
-  // Admin Panel view
   if (currentView === 'admin') {
     return (
       <AdminPanel 
         onBack={() => {
           adminLogout()
           setCurrentView('auth')
-        }} 
+        }}
+        onSwitchToDashboard={() => setCurrentView('dashboard')}
       />
     )
   }
   
-  // Dashboard view (default when logged in)
   return (
     <PlayerDashboard 
       onLogout={() => setCurrentView('auth')}
       onViewDirectory={() => setCurrentView('directory')}
+      onSwitchToAdmin={() => setCurrentView('admin')}
     />
   )
 }

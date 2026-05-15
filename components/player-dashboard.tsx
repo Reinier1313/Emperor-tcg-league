@@ -23,9 +23,10 @@ import { AccountSettingsPage } from './account-settings-page'
 interface PlayerDashboardProps {
   onLogout: () => void
   onViewDirectory: () => void
+  onSwitchToAdmin?: () => void // Add this line
 }
 
-export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardProps) {
+export function PlayerDashboard({ onLogout, onViewDirectory, onSwitchToAdmin }: PlayerDashboardProps) {
   const { currentUser, logout, setCurrentUserFromSupabase } = useLeagueStore()
   const [showSettings, setShowSettings] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -164,6 +165,8 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
       
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
+
+        
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Left Column - Stats */}
           <div className="space-y-6">
@@ -292,6 +295,18 @@ export function PlayerDashboard({ onLogout, onViewDirectory }: PlayerDashboardPr
                 <Settings className="w-8 h-8 text-muted-foreground" />
                 <span className="font-semibold">Account Settings</span>
               </Button>
+
+              {/* Conditional Admin Button */}
+              {isStaff && onSwitchToAdmin && (
+                <Button
+                  variant="outline"
+                  className="w-full h-auto py-6 flex flex-col gap-3 shadow-sm border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors"
+                  onClick={onSwitchToAdmin}
+                >
+                  <Shield className="w-8 h-8 text-primary" />
+                  <span className="font-semibold text-primary">Admin Mode</span>
+                </Button>
+              )}
             </div>
           </div>
           

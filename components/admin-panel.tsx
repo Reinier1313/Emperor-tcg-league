@@ -33,6 +33,7 @@ import { cn } from '@/lib/utils'
 
 interface AdminPanelProps {
   onBack: () => void
+  onSwitchToDashboard?: () => void // Add this line
 }
 
 /**
@@ -174,7 +175,7 @@ function AdminLogin({ onBack }: { onBack: () => void }) {
 /**
  * Main Admin Panel Component
  */
-export function AdminPanel({ onBack }: AdminPanelProps) {
+export function AdminPanel({ onBack, onSwitchToDashboard }: AdminPanelProps) {
   const { currentUser, adminLogout, calculateRank } = useLeagueStore()
   const { isInstallable, install } = usePwaInstall()
 
@@ -470,6 +471,28 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* NEW TOGGLE BUTTON */}
+              {onSwitchToDashboard && (
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={onSwitchToDashboard} 
+                  className="gap-2 hidden md:flex"
+                >
+                  <User className="w-4 h-4" />
+                  Player Mode
+                </Button>
+              )}
+
+              {isInstallable && (
+                <Button variant="default" size="icon" onClick={install} className="bg-blue-600 hover:bg-blue-700">
+                  <Download className="w-5 h-5" />
+                </Button>
+              )}
+              </div>
+
+            
+            <div className="flex items-center gap-3">
               {isInstallable && (
                 <Button variant="default" size="icon" onClick={install} className="bg-blue-600 hover:bg-blue-700">
                   <Download className="w-5 h-5" />
@@ -486,6 +509,7 @@ export function AdminPanel({ onBack }: AdminPanelProps) {
             </div>
           </div>
         </div>
+
       </header>
       
       {/* Main Content Dashboard */}
