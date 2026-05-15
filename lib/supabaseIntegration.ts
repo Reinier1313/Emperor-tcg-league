@@ -7,14 +7,9 @@ import { Player, UserRole } from './store'
 
 /**
  * Register a new player using Supabase Auth
- * Creates auth user, player profile, user role, and progression data
- */
-// ============================================
-// REGISTRATION & AUTHENTICATION
-// ============================================
-
-/**
- * Register a new player using Supabase Auth
+ * 1. Generates a unique ETL-XXXXXX Trainer ID
+ * 2. Checks for duplicate usernames/emails
+ * 3. Registers via Supabase Auth with metadata for the SQL Trigger
  */
 export async function registerPlayerInSupabase(
   email: string,
@@ -30,7 +25,7 @@ export async function registerPlayerInSupabase(
       return { success: false, error: 'Supabase not configured' }
     }
 
-    // Check if username already exists
+    // Step 1: Check if username already exists
     const { data: existingPlayer, error: checkError } = await supabase
       .from('players')
       .select('id')
@@ -42,7 +37,7 @@ export async function registerPlayerInSupabase(
       return { success: false, error: 'Trainer Name already taken' }
     }
 
-    // Check if email already exists
+    // Step 2: Check if email already exists
     const { data: existingEmail, error: emailCheckError } = await supabase
       .from('players')
       .select('id')
@@ -54,7 +49,7 @@ export async function registerPlayerInSupabase(
       return { success: false, error: 'Email already exists' }
     }
 
-    // GENERATE UNIQUE TRAINER ID (ETL-XXXXXX)
+    // Step 3: GENERATE UNIQUE TRAINER ID (ETL-XXXXXX)
     let uniqueTrainerId = '';
     let isUnique = false;
     
@@ -71,7 +66,7 @@ export async function registerPlayerInSupabase(
       if (!data) isUnique = true; 
     }
 
-    // Create auth user & pass metadata for the SQL Trigger to catch
+    // Step 4: Create auth user & pass metadata for the SQL Trigger to catch
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -107,13 +102,12 @@ export async function loginPlayerInSupabase(identifier: string, password: string
       return { success: false, error: 'Supabase not configured', isAdmin: false, player: null }
     }
 
-    let email = identifier
+    let targetEmail = identifier
 
     // If identifier is NOT an email, look up the email from the database
     if (!identifier.includes('@')) {
-      
       // Look up by exact Trainer ID OR case-insensitive Trainer Name
-      const lookupQuery = `username.ilike.${identifier},trainer_id.eq.${identifier.toUpperCase()}`;
+      const lookupQuery = `username.ilike."${identifier}",trainer_id.eq."${identifier.toUpperCase()}"`;
 
       const { data: playerLookup, error: lookupError } = await supabase
         .from('players')
@@ -122,16 +116,16 @@ export async function loginPlayerInSupabase(identifier: string, password: string
         .maybeSingle()
 
       if (lookupError || !playerLookup?.email) {
-        return { success: false, error: 'Trainer not found. Try logging in with your email.', isAdmin: false, player: null }
+        return { success: false, error: 'Trainer not found. Try logging in with your email or Trainer ID.', isAdmin: false, player: null }
       }
 
       // We found the email attached to that Trainer ID / Username!
-      email = playerLookup.email
+      targetEmail = playerLookup.email
     }
 
     // Authenticate with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email,
+      email: targetEmail,
       password,
     })
 
@@ -140,43 +134,37 @@ export async function loginPlayerInSupabase(identifier: string, password: string
 
     const userId = authData.user.id
 
-    // Get player profile
-    const { data: playerData, error: playerError } = await supabase
+    // Fetch the full profile (including the joined role and progression)
+    const { data: p, error: pError } = await supabase
       .from('players')
-      .select('*')
+      .select(`
+        *,
+        user_role:users_roles(role),
+        progression:player_progression(*)
+      `)
       .eq('user_id', userId)
       .single()
 
-    if (playerError) throw playerError
+    if (pError) throw pError
 
-    // Get user role
-    const { data: roleData } = await supabase
-      .from('users_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    const userRole = roleData?.role || 'user'
-    const isAdmin = ['super_admin', 'admin', 'moderator'].includes(userRole)
-
-    // Get player progression
-    const { data: progressionData } = await supabase
-      .from('player_progression')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle()
+    // Flatten data for the App Store
+    const prog = Array.isArray(p.progression) ? p.progression[0] : (p.progression || {})
+    const roleObj = Array.isArray(p.user_role) ? p.user_role[0] : (p.user_role || {})
+    const userRole = (roleObj.role || 'user') as UserRole
 
     const player = {
-      ...playerData,
+      ...p,
+      id: p.trainer_id, // Map ETL-XXXXXX as the primary ID
+      dbUserId: p.user_id, // Keep UUID hidden for background queries
       role: userRole,
-      progression: progressionData,
+      progression: prog,
     }
 
     return { 
       success: true, 
       player,
       userId,
-      isAdmin,
+      isAdmin: ['super_admin', 'admin', 'moderator'].includes(userRole),
     }
   } catch (error: any) {
     return { success: false, error: error.message, isAdmin: false, player: null }
@@ -215,11 +203,11 @@ export async function getCurrentSession() {
 }
 
 // ============================================
-// PLAYER MANAGEMENT
+// PLAYER & LEAGUE MANAGEMENT
 // ============================================
 
 /**
- * Fetch all players with their progression data
+ * Fetch all players for the Admin Panel
  */
 export async function fetchPlayersFromSupabase() {
   try {
@@ -291,7 +279,7 @@ export async function updatePlayerProfileInSupabase(
 }
 
 /**
- * Update player progression data
+ * Update player progression data (Wins, BP, etc.)
  */
 export async function updatePlayerProgressionInSupabase(
   userId: string,

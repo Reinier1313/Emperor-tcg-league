@@ -69,7 +69,8 @@ export interface EliteFourBadge {
 
 export interface Player {
   email: string
-  id: string
+  id: string            // FRONTEND: This will ONLY hold the "ETL-XXXXXX" ID.
+  dbUserId: string      // BACKEND: This holds the long Supabase UUID (hidden from users).
   firstName: string
   lastName: string
   trainerName: string
@@ -102,7 +103,7 @@ interface LeagueStore {
   isAdminAuthenticated: boolean
   
   // Auth actions
-  register: (player: Omit<Player, 'id' | 'role' | 'bp' | 'apexRank' | 'wins' | 'losses' | 'streak' | 'currentLeague' | 'gymBadges' | 'eliteFourBadges' | 'championBadge' | 'emperorTitle' | 'createdAt'>) => { success: boolean; message: string; player?: Player }
+  register: (player: Omit<Player, 'id' | 'dbUserId' | 'role' | 'bp' | 'apexRank' | 'wins' | 'losses' | 'streak' | 'currentLeague' | 'gymBadges' | 'eliteFourBadges' | 'championBadge' | 'emperorTitle' | 'createdAt'>) => { success: boolean; message: string; player?: Player }
   login: (identifier: string, password: string) => { success: boolean; message: string; isAdmin?: boolean }
   setCurrentUserFromSupabase: (player: any) => void
   logout: () => void
@@ -112,7 +113,7 @@ interface LeagueStore {
   adminLogout: () => void
   
   // Player management (role-based)
-  createPlayer: (playerData: Omit<Player, 'id' | 'bp' | 'apexRank' | 'wins' | 'losses' | 'streak' | 'currentLeague' | 'gymBadges' | 'eliteFourBadges' | 'championBadge' | 'emperorTitle' | 'createdAt'>, createdBy: string) => { success: boolean; message: string; player?: Player }
+  createPlayer: (playerData: Omit<Player, 'id' | 'dbUserId' | 'bp' | 'apexRank' | 'wins' | 'losses' | 'streak' | 'currentLeague' | 'gymBadges' | 'eliteFourBadges' | 'championBadge' | 'emperorTitle' | 'createdAt'>, createdBy: string) => { success: boolean; message: string; player?: Player }
   updatePlayerRole: (playerId: string, role: UserRole, updatedBy: Player) => { success: boolean; message: string }
   updatePlayerStats: (playerId: string, updates: Partial<Pick<Player, 'wins' | 'losses' | 'streak' | 'bp'>>) => void
   updatePlayerProfile: (playerId: string, updates: Partial<Pick<Player, 'firstName' | 'lastName' | 'trainerName'>>) => void
@@ -207,6 +208,7 @@ export const useLeagueStore = create<LeagueStore>()(
         const newPlayer: Player = {
           ...playerData,
           id,
+          dbUserId: '', // Local fallback users won't have a UUID
           role: 'user',
           bp: 0,
           apexRank: 'Rookie',
@@ -258,32 +260,49 @@ export const useLeagueStore = create<LeagueStore>()(
         const defaultBadges = createInitialGymBadges();
         const defaultEliteFour = createInitialEliteFourBadges();
         
-        const bp = supabasePlayer.progression?.bp || 0;
+        // Supabase joins often return arrays; we safely extract the first object
+        const prog = Array.isArray(supabasePlayer.progression) 
+          ? supabasePlayer.progression[0] 
+          : (supabasePlayer.progression || {});
+        
+        const roleObj = Array.isArray(supabasePlayer.user_role) 
+          ? supabasePlayer.user_role[0] 
+          : (supabasePlayer.user_role || {});
+        
+        const bp = prog.bp || 0;
         
         // Convert Supabase player data to local Player format
         const player: Player = {
-          id: supabasePlayer.user_id || supabasePlayer.id || '',
+          // =========================================================
+          // THIS IS THE FIX FOR THE DASHBOARD
+          // It strictly maps the generated ETL ID to the public 'id'
+          id: supabasePlayer.trainer_id || 'ID PENDING',
+          
+          // And safely hides the long UUID in 'dbUserId'
+          dbUserId: supabasePlayer.user_id || supabasePlayer.id || '',
+          // =========================================================
+
           email: supabasePlayer.email || '',
           firstName: supabasePlayer.full_name?.split(' ')[0] || '',
           lastName: supabasePlayer.full_name?.split(' ').slice(1).join(' ') || '',
           trainerName: supabasePlayer.username || '',
           password: '', // Don't store password locally
-          role: (supabasePlayer.role || 'user') as UserRole,
+          role: (roleObj.role || supabasePlayer.role || 'user') as UserRole,
           
           // Fetched live data from Supabase
           bp: bp,
           apexRank: calculateRankFromBP(bp),
-          wins: supabasePlayer.progression?.wins || 0,
-          losses: supabasePlayer.progression?.losses || 0,
-          streak: supabasePlayer.progression?.streak || 0,
+          wins: prog.wins || 0,
+          losses: prog.losses || 0,
+          streak: prog.streak || 0,
           
-          currentLeague: supabasePlayer.progression?.current_league || 'pokeball_1',
+          currentLeague: prog.current_league || 'pokeball_1',
           
           // Use saved badges if they exist, otherwise fallback
-          gymBadges: supabasePlayer.progression?.gym_badges || defaultBadges,
-          eliteFourBadges: supabasePlayer.progression?.elite_four_badges || defaultEliteFour,
-          championBadge: supabasePlayer.progression?.champion_badge || false,
-          emperorTitle: supabasePlayer.progression?.emperor_title || null,
+          gymBadges: prog.gym_badges || defaultBadges,
+          eliteFourBadges: prog.elite_four_badges || defaultEliteFour,
+          championBadge: prog.champion_badge || false,
+          emperorTitle: prog.emperor_title || null,
           
           createdAt: supabasePlayer.created_at || new Date().toISOString(),
         }
@@ -321,6 +340,7 @@ export const useLeagueStore = create<LeagueStore>()(
         const newPlayer: Player = {
           ...playerData,
           id,
+          dbUserId: '', // Local fallback users won't have a UUID
           bp: 0,
           apexRank: 'Rookie',
           wins: 0,
