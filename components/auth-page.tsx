@@ -59,7 +59,12 @@ export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPage
       // The page routing will check user role and route appropriately
       onSuccess()
     } else {
-      setLoginError(supabaseResult.error || 'Invalid email or password')
+      // Supabase throws a specific error if the email isn't confirmed yet
+      if (supabaseResult.error?.includes('Email not confirmed')) {
+        setLoginError('Please check your email and click the confirmation link before logging in.')
+      } else {
+        setLoginError(supabaseResult.error || 'Invalid email or password')
+      }
     }
     
     setLoginLoading(false)
@@ -235,7 +240,8 @@ export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPage
                       <AlertDescription>
                         Registration successful! Your Trainer ID is{' '}
                         <span className="font-mono font-bold">{registerSuccess.trainerId}</span>
-                        . You can now login.
+                        .<br/><br/>
+                        <strong>Please check your email to confirm your account before logging in.</strong>
                       </AlertDescription>
                     </Alert>
                   )}
@@ -256,7 +262,7 @@ export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPage
                       <Label htmlFor="firstName">First Name</Label>
                       <Input
                         id="firstName"
-                        placeholder="Juan"
+                        placeholder="Ash"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
                       />
@@ -265,7 +271,7 @@ export function AuthPage({ onSuccess, onAdminLogin, onForgotPassword }: AuthPage
                       <Label htmlFor="lastName">Last Name</Label>
                       <Input
                         id="lastName"
-                        placeholder="Dela Cruz"
+                        placeholder="Ketchum"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
                       />
