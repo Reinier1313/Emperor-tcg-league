@@ -28,7 +28,7 @@ export async function registerPlayerInSupabase(
       .from('players')
       .select('id')
       .ilike('username', playerData.trainerName)
-      .maybeSingle() // Safer than .single() as it doesn't throw on 0 results
+      .maybeSingle() 
 
     if (checkError) throw checkError
     if (existingPlayer) {
@@ -47,63 +47,27 @@ export async function registerPlayerInSupabase(
       return { success: false, error: 'Email already exists' }
     }
 
-    // Step 1: Create auth user via Supabase Auth
+    // Step 1: Create auth user AND pass metadata for the SQL Trigger
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        data: {
+          first_name: playerData.firstName,
+          last_name: playerData.lastName,
+          trainer_name: playerData.trainerName,
+        }
+      }
     })
 
     if (authError) throw authError
     if (!authData.user) throw new Error('Failed to create user')
 
-    const userId = authData.user.id
-
-    // Step 2: Create player profile
-    const { data: playerRecord, error: playerError } = await supabase
-      .from('players')
-      .insert([
-        {
-          user_id: userId,
-          username: playerData.trainerName,
-          email: email,
-          full_name: `${playerData.firstName} ${playerData.lastName}`,
-        },
-      ])
-      .select()
-      .single()
-
-    if (playerError) {
-      console.error("Player profile creation error:", playerError)
-      throw new Error("Account created, but profile setup failed. Please contact support.")
-    }
-
-    // Step 3: Create user role (default to 'user')
-    const { error: roleError } = await supabase
-      .from('users_roles')
-      .insert([
-        {
-          user_id: userId,
-          role: 'user',
-        },
-      ])
-
-    if (roleError) throw roleError
-
-    // Step 4: Create player progression
-    const { error: progressionError } = await supabase
-      .from('player_progression')
-      .insert([
-        {
-          user_id: userId,
-        },
-      ])
-
-    if (progressionError) throw progressionError
+    // Steps 2, 3, and 4 are now automatically handled by the Supabase SQL Trigger!
 
     return { 
       success: true, 
-      player: playerRecord, 
-      userId,
+      userId: authData.user.id,
       trainerId: playerData.trainerName 
     }
   } catch (error: any) {
