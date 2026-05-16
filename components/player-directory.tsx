@@ -322,10 +322,6 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
                       <p className="font-medium">{selectedPlayer.firstName} {selectedPlayer.lastName}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground flex items-center gap-1 mb-1"><Mail className="w-3 h-3"/> Email</p>
-                      <p className="font-medium truncate" title={selectedPlayer.email}>{selectedPlayer.email || 'N/A'}</p>
-                    </div>
-                    <div>
                       <p className="text-muted-foreground flex items-center gap-1 mb-1"><CalendarDays className="w-3 h-3"/> Joined</p>
                       <p className="font-medium">{new Date(selectedPlayer.createdAt).toLocaleDateString()}</p>
                     </div>
