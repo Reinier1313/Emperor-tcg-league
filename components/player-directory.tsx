@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ArrowLeft, Search, User, Trophy, Zap, Shield, Crown, UserCog, Loader2 } from 'lucide-react'
+import { ArrowLeft, Search, User, Trophy, Zap, Shield, Crown, UserCog, Loader2, CalendarDays, Mail, Medal, BarChart2, Hash } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 
@@ -51,6 +51,7 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
         
         if (res.success && res.players && isMounted) {
           const mapped = res.players.map((p: any) => {
+            // Safely unwrap Supabase joined data (handles arrays or direct objects)
             const prog = Array.isArray(p.progression) ? p.progression[0] : (p.progression || {})
             const roleObj = Array.isArray(p.user_role) ? p.user_role[0] : (p.user_role || {})
             const bp = prog.bp || 0
@@ -287,18 +288,120 @@ export function PlayerDirectory({ onBack }: PlayerDirectoryProps) {
         )}
       </main>
       
-      {/* Player Profile Modal */}
+      {/* Player Profile Detailed Modal */}
       <Dialog open={!!selectedPlayer} onOpenChange={(open) => !open && setSelectedPlayer(null)}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-md md:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-xl">
               <Trophy className="w-5 h-5 text-primary" />
               Trainer Profile
             </DialogTitle>
           </DialogHeader>
+          
           {selectedPlayer && (
-            <div className="pt-2">
-              <TrainerCard player={selectedPlayer} />
+            <div className="space-y-6 pt-4 pb-2">
+              {/* Center the Trainer Card at the top */}
+              <div className="flex justify-center">
+                <TrainerCard player={selectedPlayer} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Trainer Information */}
+                <div className="bg-card border rounded-lg p-4 space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2 border-b pb-2">
+                    <User className="w-4 h-4 text-primary" />
+                    Trainer Information
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground flex items-center gap-1 mb-1"><Hash className="w-3 h-3"/> Trainer ID</p>
+                      <p className="font-medium font-mono">{selectedPlayer.id}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground flex items-center gap-1 mb-1"><User className="w-3 h-3"/> Real Name</p>
+                      <p className="font-medium">{selectedPlayer.firstName} {selectedPlayer.lastName}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground flex items-center gap-1 mb-1"><Mail className="w-3 h-3"/> Email</p>
+                      <p className="font-medium truncate" title={selectedPlayer.email}>{selectedPlayer.email || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground flex items-center gap-1 mb-1"><CalendarDays className="w-3 h-3"/> Joined</p>
+                      <p className="font-medium">{new Date(selectedPlayer.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* League Progress */}
+                <div className="bg-card border rounded-lg p-4 space-y-4">
+                  <h3 className="font-semibold flex items-center gap-2 border-b pb-2">
+                    <Medal className="w-4 h-4 text-primary" />
+                    League Progress
+                  </h3>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Current League:</span>
+                      <span className="font-semibold uppercase tracking-wider bg-primary/10 text-primary px-2 py-1 rounded text-xs">
+                        {selectedPlayer.currentLeague.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Gym Badges (Current):</span>
+                      <span className="font-semibold">
+                        {/* Safe optional chaining ? added below to prevent crashes if JSONB is missing data */}
+                        {selectedPlayer.gymBadges?.[selectedPlayer.currentLeague]?.filter(b => b.earned).length || 0} / 8
+                      </span>
+                    </div>
+                    {selectedPlayer.championBadge && (
+                      <div className="flex justify-between items-center pt-1 border-t">
+                        <span className="text-muted-foreground">Status:</span>
+                        <span className="font-bold text-amber-600 bg-amber-100 px-2 py-1 rounded text-xs">
+                          LEAGUE CHAMPION
+                        </span>
+                      </div>
+                    )}
+                    {selectedPlayer.emperorTitle && (
+                      <div className="flex justify-between items-center pt-1 border-t">
+                        <span className="text-muted-foreground">Emperor Title:</span>
+                        <span className="font-bold text-purple-600 bg-purple-100 px-2 py-1 rounded text-xs uppercase">
+                          {selectedPlayer.emperorTitle.replace('_', ' ')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Battle Statistics */}
+              <div className="bg-card border rounded-lg p-4 space-y-4">
+                <h3 className="font-semibold flex items-center gap-2 border-b pb-2">
+                  <BarChart2 className="w-4 h-4 text-primary" />
+                  Battle Statistics
+                </h3>
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="bg-muted rounded-md p-3 text-center">
+                    <p className="text-2xl font-bold text-foreground">{selectedPlayer.wins}</p>
+                    <p className="text-[10px] uppercase text-muted-foreground font-semibold mt-1">Wins</p>
+                  </div>
+                  <div className="bg-muted rounded-md p-3 text-center">
+                    <p className="text-2xl font-bold text-foreground">{selectedPlayer.losses}</p>
+                    <p className="text-[10px] uppercase text-muted-foreground font-semibold mt-1">Losses</p>
+                  </div>
+                  <div className="bg-muted rounded-md p-3 text-center">
+                    <p className="text-2xl font-bold text-foreground">
+                      {selectedPlayer.wins + selectedPlayer.losses > 0 
+                        ? Math.round((selectedPlayer.wins / (selectedPlayer.wins + selectedPlayer.losses)) * 100) 
+                        : 0}%
+                    </p>
+                    <p className="text-[10px] uppercase text-muted-foreground font-semibold mt-1">Win Rate</p>
+                  </div>
+                  <div className="bg-muted rounded-md p-3 text-center">
+                    <p className="text-2xl font-bold text-foreground">{selectedPlayer.streak}</p>
+                    <p className="text-[10px] uppercase text-muted-foreground font-semibold mt-1">Win Streak</p>
+                  </div>
+                </div>
+              </div>
+
             </div>
           )}
         </DialogContent>
