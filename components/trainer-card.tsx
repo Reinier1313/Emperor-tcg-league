@@ -94,8 +94,6 @@ function CenterPokeball({
   wins: number
   filled?: boolean 
 }) {
-  // Determine fill state based on wins
-  // 0 wins = empty ring, 1+ wins = start filling
   const showFill = filled || wins > 0
   
   return (
@@ -106,37 +104,13 @@ function CenterPokeball({
       xmlns="http://www.w3.org/2000/svg"
     >
       {/* Outer ring */}
-      <circle 
-        cx="50" 
-        cy="50" 
-        r="45" 
-        stroke="#374151"
-        strokeWidth="8" 
-        fill="none"
-      />
+      <circle cx="50" cy="50" r="45" stroke="#374151" strokeWidth="8" fill="none" />
       {/* Inner white circle */}
-      <circle 
-        cx="50" 
-        cy="50" 
-        r="38" 
-        fill="white"
-      />
+      <circle cx="50" cy="50" r="38" fill="white" />
       {/* Center fill (shows progress) */}
-      {showFill && (
-        <circle 
-          cx="50" 
-          cy="50" 
-          r="20" 
-          fill="#374151"
-        />
-      )}
+      {showFill && <circle cx="50" cy="50" r="20" fill="#374151" />}
       {/* Center white dot */}
-      <circle 
-        cx="50" 
-        cy="50" 
-        r={showFill ? 8 : 12}
-        fill="white"
-      />
+      <circle cx="50" cy="50" r={showFill ? 8 : 12} fill="white" />
     </svg>
   )
 }
@@ -163,17 +137,14 @@ function CornerFrame({
   }
   
   return (
-    <div className={cn(
-      'absolute w-6 h-6',
-      positionClasses[position],
-      colorClass
-    )} />
+    <div className={cn('absolute w-6 h-6', positionClasses[position], colorClass)} />
   )
 }
 
 // Get current league display info
-function getLeagueInfo(league: LeagueStage): { name: string; number: number; type: 'pokeball' | 'greatball' | 'ultraball' | 'masterball' } {
-  const mapping: Record<LeagueStage, { name: string; number: number; type: 'pokeball' | 'greatball' | 'ultraball' | 'masterball' }> = {
+function getLeagueInfo(league: LeagueStage | undefined): { name: string; number: number; type: 'pokeball' | 'greatball' | 'ultraball' | 'masterball' } {
+  const safeLeague = league || 'pokeball_1'
+  const mapping: Record<string, { name: string; number: number; type: 'pokeball' | 'greatball' | 'ultraball' | 'masterball' }> = {
     pokeball_1: { name: 'LEAGUE ONE', number: 1, type: 'pokeball' },
     pokeball_2: { name: 'LEAGUE TWO', number: 2, type: 'pokeball' },
     pokeball_3: { name: 'LEAGUE THREE', number: 3, type: 'pokeball' },
@@ -185,12 +156,13 @@ function getLeagueInfo(league: LeagueStage): { name: string; number: number; typ
     ultraball_3: { name: 'LEAGUE THREE', number: 3, type: 'ultraball' },
     masterball: { name: 'MASTER LEAGUE', number: 0, type: 'masterball' },
   }
-  return mapping[league]
+  return mapping[safeLeague] || mapping.pokeball_1
 }
 
 // Get rank color for display
-function getRankColor(rank: ApexRank): string {
-  const colors: Record<ApexRank, string> = {
+function getRankColor(rank: ApexRank | undefined): string {
+  const safeRank = rank || 'Rookie'
+  const colors: Record<string, string> = {
     Rookie: 'text-zinc-600',
     Ace: 'text-amber-600',
     Rival: 'text-blue-600',
@@ -202,15 +174,23 @@ function getRankColor(rank: ApexRank): string {
     Ascended: 'text-amber-500',
     Invictus: 'text-rose-500',
   }
-  return colors[rank]
+  return colors[safeRank] || colors.Rookie
 }
 
 export function TrainerCard({ player, className }: TrainerCardProps) {
   const [isFlipped, setIsFlipped] = useState(false)
-  const leagueInfo = getLeagueInfo(player.currentLeague)
   
-  // Count earned badges for current league
-  const earnedBadges = player.gymBadges[player.currentLeague].filter(b => b.earned).length
+  // SAFE FALLBACKS: Ensure the card doesn't crash if Supabase data is missing
+  const safeLeague = player.currentLeague || 'pokeball_1'
+  const leagueInfo = getLeagueInfo(safeLeague)
+  
+  // Create a default array of 8 empty badges if none exist for this user yet
+  const safeBadges = player.gymBadges && Array.isArray(player.gymBadges[safeLeague]) 
+    ? player.gymBadges[safeLeague] 
+    : Array(8).fill({ earned: false })
+
+  // Safely count earned badges
+  const earnedBadges = safeBadges.filter(b => b.earned).length
 
   return (
     <div className={cn('w-full max-w-md mx-auto', className)}>
@@ -229,35 +209,33 @@ export function TrainerCard({ player, className }: TrainerCardProps) {
             <div className="h-full w-full rounded-xl overflow-hidden shadow-2xl border-2 border-foreground/20">
               {/* Top Red Section (60%) */}
               <div className="h-[55%] bg-primary relative overflow-hidden">
-                {/* Corner frames */}
                 <CornerFrame position="top-left" color="white" />
                 <CornerFrame position="top-right" color="white" />
                 
                 {/* Username/QR Zone (top left) */}
                 <div className="absolute top-4 left-10">
                   <p className="text-[10px] text-primary-foreground/70 uppercase tracking-wider font-bold mb-1">
-                    @{player.trainerName.toUpperCase().replace(/\s/g, '')}
+                    @{player.trainerName ? player.trainerName.toUpperCase().replace(/\s/g, '') : 'UNKNOWN'}
                   </p>
                   <div className="flex items-center gap-2">
                     <div className="w-10 h-10 bg-primary-foreground/20 rounded flex items-center justify-center">
                       <QrCode className="w-6 h-6 text-primary-foreground/60" />
                     </div>
-                    
                   </div>
                 </div>
                 
                 {/* Center Logo */}
                 <div className="absolute inset-0 flex items-center justify-center pt-2">
-                              <div className="relative w-40 md:w-56 aspect-[3/1]">
-                                <Image
-                                  src="/emperor-tcg.png"
-                                  alt="Emperor TCG League"
-                                  fill
-                                  className="object-contain"
-                                  priority
-                                />
-                              </div>
-                            </div>
+                  <div className="relative w-40 md:w-56 aspect-[3/1]">
+                    <Image
+                      src="/emperor-tcg.png"
+                      alt="Emperor TCG League"
+                      fill
+                      className="object-contain"
+                      priority
+                    />
+                  </div>
+                </div>
                 
                 {/* Sticker Zone (top right) */}
                 <div className="absolute top-4 right-4">
@@ -279,15 +257,13 @@ export function TrainerCard({ player, className }: TrainerCardProps) {
               
               {/* Center Divider with Pokeball */}
               <div className="h-1 bg-foreground relative">
-                {/* Center pokeball overlapping */}
                 <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-10">
-                  <CenterPokeball wins={player.wins} filled={earnedBadges > 0} />
+                  <CenterPokeball wins={player.wins || 0} filled={earnedBadges > 0} />
                 </div>
               </div>
               
               {/* Bottom White Section (40%) */}
               <div className="h-[calc(45%-4px)] bg-card relative">
-                {/* Corner frames */}
                 <CornerFrame position="bottom-left" color="red" />
                 <CornerFrame position="bottom-right" color="red" />
                 
@@ -310,12 +286,12 @@ export function TrainerCard({ player, className }: TrainerCardProps) {
                   </div>
                 </div>
                 
-                {/* Player info at very bottom corners (subtle) */}
+                {/* Player info at very bottom corners */}
                 <div className="absolute bottom-1 left-10 text-[8px] text-muted-foreground font-mono">
                   {player.id}
                 </div>
                 <div className="absolute bottom-1 right-10 text-[8px] text-muted-foreground">
-                  {leagueRegions[player.currentLeague]}
+                  {leagueRegions[safeLeague as LeagueStage] || 'Unknown Region'}
                 </div>
               </div>
             </div>
@@ -326,13 +302,12 @@ export function TrainerCard({ player, className }: TrainerCardProps) {
             <div className="h-full w-full rounded-xl overflow-hidden shadow-2xl border-2 border-foreground/20">
               {/* Top Red Section with 4 badges */}
               <div className="h-[50%] bg-primary relative overflow-hidden">
-                {/* Corner frames */}
                 <CornerFrame position="top-left" color="white" />
                 <CornerFrame position="top-right" color="white" />
                 
                 {/* 4 Gym badges row */}
                 <div className="absolute inset-0 flex items-center justify-center gap-4 px-8">
-                  {player.gymBadges[player.currentLeague].slice(0, 4).map((badge, i) => (
+                  {safeBadges.slice(0, 4).map((badge, i) => (
                     <PokeballBadge key={i} earned={badge.earned} size="lg" variant="dark" />
                   ))}
                 </div>
@@ -343,13 +318,12 @@ export function TrainerCard({ player, className }: TrainerCardProps) {
               
               {/* Bottom White Section with 4 badges */}
               <div className="h-[calc(50%-4px)] bg-card relative">
-                {/* Corner frames - mixed red and black */}
                 <div className="absolute bottom-3 left-3 w-6 h-6 border-l-2 border-b-2 border-foreground" />
                 <div className="absolute bottom-3 right-3 w-6 h-6 border-r-2 border-b-2 border-primary" />
                 
                 {/* 4 Gym badges row */}
                 <div className="absolute inset-0 flex items-center justify-center gap-4 px-8">
-                  {player.gymBadges[player.currentLeague].slice(4, 8).map((badge, i) => (
+                  {safeBadges.slice(4, 8).map((badge, i) => (
                     <PokeballBadge key={i + 4} earned={badge.earned} size="lg" variant="light" />
                   ))}
                 </div>
@@ -368,10 +342,10 @@ export function TrainerCard({ player, className }: TrainerCardProps) {
       <div className="flex items-center justify-between mt-4 px-2">
         <div className="text-sm">
           <span className="text-muted-foreground">BP: </span>
-          <span className="font-bold text-foreground">{player.bp}</span>
+          <span className="font-bold text-foreground">{player.bp || 0}</span>
           <span className="text-muted-foreground mx-2">|</span>
           <span className={cn('font-semibold', getRankColor(player.apexRank))}>
-            {player.apexRank}
+            {player.apexRank || 'Rookie'}
           </span>
         </div>
         <Button 
